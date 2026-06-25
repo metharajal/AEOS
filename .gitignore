@@ -1,0 +1,365 @@
+# ==============================================================================
+# AI Foundation Kit — .gitignore
+# ==============================================================================
+#
+# Sections :
+#   1.  macOS
+#   2.  Conflits Git
+#   3.  Éditeurs (VS Code, JetBrains, Cursor, Windsurf, Vim)
+#   4.  Python
+#   5.  Node.js
+#   6.  Docker
+#   7.  Terraform
+#   8.  Documentation (MkDocs)
+#   9.  Outils IA & caches
+#   10. Secrets & credentials
+#   11. Logs & fichiers temporaires
+#
+# Règle absolue : aucun secret, clé, token ou donnée personnelle dans git.
+# Les fichiers *.example sont intentionnellement versionnés (contrats de config).
+# ==============================================================================
+
+
+# ==============================================================================
+# 1. macOS
+# ==============================================================================
+
+.DS_Store
+.DS_Store?
+._*
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+.TemporaryItems
+.DocumentRevisions-V100
+.fseventsd
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Icon?
+Network Trash Folder/
+Temporary Items/
+.apdisk
+
+
+# ==============================================================================
+# 2. Conflits Git
+# ==============================================================================
+
+*.orig
+*.BACKUP.*
+*.BASE.*
+*.LOCAL.*
+*.REMOTE.*
+*_BACKUP_*.txt
+*_BASE_*.txt
+*_LOCAL_*.txt
+*_REMOTE_*.txt
+
+
+# ==============================================================================
+# 3. Éditeurs
+# ==============================================================================
+
+# VS Code — on versionne uniquement les fichiers utiles à l'équipe
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.history/
+*.vsix
+
+# JetBrains (IntelliJ, WebStorm, PyCharm, GoLand, RustRover…)
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea_modules/
+
+# Cursor — .cursorrules à la racine est versionné ; le cache IDE non
+.cursor/
+
+# Windsurf — .windsurfrules à la racine est versionné ; le cache IDE non
+.windsurf/
+
+# Vim / Neovim
+*.swp
+*.swo
+*~
+Session.vim
+.netrwhist
+
+
+# ==============================================================================
+# 4. Python
+# ==============================================================================
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.python-version
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Tests & coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Type checkers & linters
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+.pytype/
+cython_debug/
+
+
+# ==============================================================================
+# 5. Node.js
+# ==============================================================================
+
+node_modules/
+.npm/
+.pnp.js
+.pnp.cjs
+.node_repl_history
+*.tgz
+
+# Yarn
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# Logs npm / yarn / pnpm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+lerna-debug.log*
+
+# Cache linters
+.eslintcache
+.stylelintcache
+
+# Build output — à affiner par projet si des sous-dossiers sont nécessaires
+dist/
+.next/
+.nuxt/
+.output/
+
+
+# ==============================================================================
+# 6. Docker
+# ==============================================================================
+
+# Surcharges locales du développeur (jamais dans git)
+docker-compose.override.yml
+
+# Contexte de build Docker local
+.docker/
+
+
+# ==============================================================================
+# 7. Terraform
+# ==============================================================================
+
+# Cache local des providers (binaires téléchargés) — JAMAIS dans git
+.terraform/
+
+# États Terraform — gérés par le backend distant (S3, GCS, Vault…)
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Fichiers de variables sensibles — les *.tfvars.example sont versionnés
+*.tfvars
+!*.tfvars.example
+
+# Logs de crash
+crash.log
+crash.*.log
+
+# Overrides locaux
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Configuration CLI locale
+.terraformrc
+terraform.rc
+
+# Note : .terraform.lock.hcl est intentionnellement versionné
+# (équivalent de package-lock.json — garantit la reproductibilité des builds)
+
+
+# ==============================================================================
+# 8. Documentation (MkDocs)
+# ==============================================================================
+
+# Site généré — jamais dans git (déployé par CI sur gh-pages)
+site/
+
+# Caches MkDocs
+docs/.cache/
+.mkdocs-cache/
+
+
+# ==============================================================================
+# 9. Outils IA & caches
+# ==============================================================================
+
+# Claude Code
+# settings.json (config équipe) est versionné — pas les overrides locaux
+.claude/settings.local.json
+# Données de session locales (dans ~/.claude/ en pratique, pas dans le projet)
+.claude/sessions/
+.claude/paste-cache/
+.claude/shell-snapshots/
+
+# Continue.dev
+# config.json (config équipe) est versionné — cache et logs non
+.continue/index/
+.continue/logs/
+
+# GitHub Copilot
+# copilot-instructions.md dans .github/ est versionné — cache non
+.copilot/
+
+# Ollama — les modèles ne vont jamais dans git (plusieurs GB)
+.ollama/
+
+# LM Studio — modèles et cache locaux
+.lmstudio/
+
+# OpenHands / Antigravity — à compléter selon chemins réels
+# .openhands/cache/
+
+
+# ==============================================================================
+# 10. Secrets & credentials
+# ==============================================================================
+
+# Variables d'environnement
+# Les *.example sont des contrats de configuration — ils DOIVENT être versionnés
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Clés et certificats
+*.pem
+*.key
+*.p12
+*.p8
+*.pfx
+*.crt
+*.cer
+*.der
+
+# Clés SSH
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+id_ecdsa
+id_ecdsa.*
+id_dsa
+id_dsa.*
+
+# GPG
+*.asc
+*.gpg
+secring.*
+
+# age (clés privées uniquement — les fichiers chiffrés .age sont versionnés)
+*.age.key
+identity.txt
+
+# HashiCorp Vault
+.vault-token
+
+# Fichiers de secrets applicatifs (les *.example sont versionnés)
+secrets.yml
+secrets.yaml
+secrets.json
+!*secrets*.example
+
+# AWS
+.aws/credentials
+.aws/config
+
+# Google Cloud
+application_default_credentials.json
+*-credentials.json
+
+# Note : les fichiers SOPS chiffrés (*.sops.yaml, *.enc.*) sont intentionnellement
+# versionnés — ils contiennent des secrets chiffrés, pas des secrets en clair.
+
+
+# ==============================================================================
+# 11. Logs & fichiers temporaires
+# ==============================================================================
+
+# Logs
+*.log
+logs/
+log/
+
+# Temporaires
+*.tmp
+*.temp
+*.bak
+*.backup
+tmp/
+temp/
+
+# Archives (ne pas versionner des binaires lourds)
+*.tar.gz
+*.tar.bz2
+*.zip
+*.gz
+*.tgz
+*.rar
+*.7z
+
+# OS Windows (pour les contributeurs cross-platform)
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
