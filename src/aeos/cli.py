@@ -6,9 +6,12 @@ import typer
 
 from aeos.generators import GENERATORS
 from aeos.onboarding import check_project
+from aeos.project import inspect_project
 from aeos.version import __version__
 
 app = typer.Typer(add_completion=False)
+project_app = typer.Typer(help="Project management commands.")
+app.add_typer(project_app, name="project")
 
 REQUIRED_TOOLS = ["python", "uv", "git", "docker", "node", "pnpm", "gh", "code"]
 
@@ -108,3 +111,46 @@ def onboard(
 
     if missing:
         raise typer.Exit(code=1)
+
+
+@project_app.command("inspect")
+def project_inspect(
+    path: str = typer.Option(".", "--path", "-p", help="Path to inspect."),
+) -> None:
+    """Inspect an AEOS project and display a summary."""
+    project = Path(path).resolve()
+    result = inspect_project(project)
+
+    def _status(found: bool) -> str:
+        return "OK" if found else "MISSING"
+
+    def _line(label: str, found: bool) -> None:
+        typer.echo(f"{label:<30} {_status(found)}")
+
+    typer.echo(f"Project: {result.name}")
+    typer.echo(f"Path:    {result.path}")
+    typer.echo("")
+    typer.echo("--- Configuration ---")
+    _line("aeos.toml", result.aeos_toml)
+    _line("pyproject.toml", result.pyproject_toml)
+    typer.echo("")
+    typer.echo("--- Documentation ---")
+    _line("README.md", result.readme)
+    _line("MANIFESTO.md", result.manifesto)
+    _line("CONSTITUTION.md", result.constitution)
+    typer.echo("")
+    typer.echo("--- Governance ---")
+    _line("governance/", result.governance)
+    typer.echo("")
+    typer.echo("--- Structure ---")
+    _line("docs/", result.docs)
+    _line("src/", result.src)
+    _line("tests/", result.tests)
+    typer.echo("")
+    typer.echo("--- CI ---")
+    _line(".github/workflows/ci.yml", result.ci_yml)
+    typer.echo("")
+    typer.echo("--- Git ---")
+    _line("repository", result.git_present)
+    remote = result.remote_origin if result.remote_origin else "(none)"
+    typer.echo(f"{'remote origin':<30} {remote}")

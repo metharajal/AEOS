@@ -135,3 +135,19 @@ def test_onboard_no_check_flag(tmp_path: Path) -> None:
     result = runner.invoke(app, ["onboard", str(tmp_path)])
     assert result.exit_code == 1
     assert "--check" in result.output
+
+
+def test_project_inspect_current_dir(tmp_path: Path) -> None:
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["project", "inspect"])
+    mp.undo()
+    assert result.exit_code == 0
+    assert "Project:" in result.output
+
+
+def test_project_inspect_with_path(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["project", "inspect", "--path", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "Project:" in result.output
+    assert "(unknown)" in result.output
