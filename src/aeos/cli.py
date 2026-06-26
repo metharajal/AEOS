@@ -5,7 +5,7 @@ from typing import Annotated
 
 import typer
 
-from aeos.ai import read_ai_config, run_ai_doctor
+from aeos.ai import LocalAiError, ask_local_ai, read_ai_config, run_ai_doctor
 from aeos.generators import GENERATORS
 from aeos.onboarding import check_project
 from aeos.project import inspect_project
@@ -299,3 +299,40 @@ def ai_doctor() -> None:
 
     if result.status == "ERROR":
         raise typer.Exit(code=1)
+
+
+@ai_app.command("ask")
+def ai_ask(
+    prompt: str = typer.Argument(..., help="Prompt to send to the local AI."),
+    provider: str = typer.Option("local", "--provider", help="AI provider to use."),
+    timeout: int = typer.Option(30, "--timeout", help="Request timeout in seconds."),
+) -> None:
+    """Send a prompt to the configured local AI provider."""
+    if not prompt.strip():
+        typer.echo("Error: prompt cannot be empty.", err=True)
+        raise typer.Exit(code=1)
+
+    if provider != "local":
+        typer.echo(
+            f"Error: provider '{provider}' is not supported in this sprint."
+            " Use --provider local.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    config = read_ai_config(Path("."))
+    if config is None:
+        typer.echo(
+            "Error: 'aeos.toml' not found or invalid."
+            " Run 'aeos init' to create a project.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    try:
+        response = ask_local_ai(prompt, config, timeout=timeout)
+    except LocalAiError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(code=1) from None
+
+    typer.echo(response.text)

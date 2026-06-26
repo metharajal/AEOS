@@ -1,9 +1,14 @@
+import json
+import urllib.error
+from collections.abc import Callable
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
-from aeos.ai.config import read_ai_config
+from aeos.ai.config import AiConfig, AiFrontierConfig, AiLocalConfig, read_ai_config
 from aeos.ai.doctor import run_ai_doctor
+from aeos.ai.local import LocalAiError, ask_local_ai
 
 
 def test_read_ai_config_returns_none_if_no_toml(tmp_path: Path) -> None:
@@ -159,3 +164,70 @@ def test_run_ai_doctor_frontier_env_missing(
     result = run_ai_doctor(tmp_path)
     assert result.frontier.api_key_env_present is False
     assert result.status == "WARNING"
+
+
+def _make_ollama_config() -> AiConfig:
+    return AiConfig(
+        mode="local-first",
+        frontier_allowed=True,
+        require_human_approval=True,
+        local=AiLocalConfig(
+            provider="ollama",
+            base_url="http://localhost:11434",
+            default_model="llama3.2",
+        ),
+        frontier=AiFrontierConfig(
+            provider="openai-compatible",
+            base_url_env="AEOS_FRONTIER_BASE_URL",
+            api_key_env="AEOS_FRONTIER_API_KEY",
+            default_model_env="AEOS_FRONTIER_MODEL",
+        ),
+        source="aeos.toml",
+    )
+
+
+def _fake_urlopen(
+    response_dict: dict[str, object],
+) -> Callable[..., MagicMock]:
+    def _open(_req: object, **_kwargs: object) -> MagicMock:
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps(response_dict).encode("utf-8")
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        return mock_resp
+
+    return _open
+
+
+def test_ask_local_ai_returns_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "aeos.ai.local.urllib.request.urlopen",
+        _fake_urlopen({"response": "AEOS est un système.", "done": True}),
+    )
+    result = ask_local_ai("Explique AEOS", _make_ollama_config())
+    assert result.text == "AEOS est un système."
+
+
+def test_ask_local_ai_ollama_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _raise(_req: object, **_kwargs: object) -> None:
+        raise urllib.error.URLError("Connection refused")
+
+    monkeypatch.setattr("aeos.ai.local.urllib.request.urlopen", _raise)
+    with pytest.raises(LocalAiError, match="Ollama unreachable"):
+        ask_local_ai("test", _make_ollama_config())
+
+
+def test_ask_local_ai_empty_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "aeos.ai.local.urllib.request.urlopen",
+        _fake_urlopen({"response": "", "done": True}),
+    )
+    with pytest.raises(LocalAiError, match="empty or invalid"):
+        ask_local_ai("test", _make_ollama_config())
+
+
+def test_ask_local_ai_unsupported_provider() -> None:
+    config = _make_ollama_config()
+    config.local.provider = "lm-studio"
+    with pytest.raises(LocalAiError, match="unsupported local provider"):
+        ask_local_ai("test", config)
