@@ -301,3 +301,70 @@ def test_ai_config_missing_toml(tmp_path: Path) -> None:
     mp.undo()
     assert result.exit_code == 1
     assert "aeos.toml" in result.output
+
+
+def test_ai_doctor_missing_toml(tmp_path: Path) -> None:
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["ai", "doctor"])
+    mp.undo()
+    assert result.exit_code == 1
+    assert "ERROR" in result.output
+
+
+def test_ai_doctor_displays_sections(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "aeos.toml").write_text(
+        "\n".join(
+            [
+                "[ai]",
+                'mode = "local-first"',
+                "frontier_allowed = true",
+                "require_human_approval = true",
+                "",
+                "[ai.local]",
+                'provider = "ollama"',
+                'base_url = "http://localhost:11434"',
+                'default_model = "llama3.2"',
+                "",
+                "[ai.frontier]",
+                'provider = "openai-compatible"',
+                'base_url_env = "AEOS_FRONTIER_BASE_URL"',
+                'api_key_env = "AEOS_FRONTIER_API_KEY"',
+                'default_model_env = "AEOS_FRONTIER_MODEL"',
+            ]
+        )
+    )
+    monkeypatch.setattr(
+        "aeos.ai.doctor._check_endpoint", lambda url, timeout: (True, "")
+    )
+    monkeypatch.delenv("AEOS_FRONTIER_BASE_URL", raising=False)
+    monkeypatch.delenv("AEOS_FRONTIER_API_KEY", raising=False)
+    monkeypatch.delenv("AEOS_FRONTIER_MODEL", raising=False)
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["ai", "doctor"])
+    mp.undo()
+    assert result.exit_code == 0
+    assert "--- Configuration ---" in result.output
+    assert "--- Local AI ---" in result.output
+    assert "--- Frontier AI ---" in result.output
+    assert "--- Result ---" in result.output
+    assert "ollama" in result.output
+    assert "AEOS_FRONTIER_API_KEY" in result.output
+
+
+def test_ai_doctor_never_displays_api_key_value(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "aeos.toml").write_text('[project]\nname = "test"\n')
+    monkeypatch.setattr(
+        "aeos.ai.doctor._check_endpoint", lambda url, timeout: (True, "")
+    )
+    monkeypatch.setenv("AEOS_FRONTIER_API_KEY", "sk-super-secret-key")
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["ai", "doctor"])
+    mp.undo()
+    assert "sk-super-secret-key" not in result.output

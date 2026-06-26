@@ -5,7 +5,7 @@ from typing import Annotated
 
 import typer
 
-from aeos.ai import read_ai_config
+from aeos.ai import read_ai_config, run_ai_doctor
 from aeos.generators import GENERATORS
 from aeos.onboarding import check_project
 from aeos.project import inspect_project
@@ -237,3 +237,65 @@ def ai_config() -> None:
     _line("base_url_env", config.frontier.base_url_env)
     _line("api_key_env", config.frontier.api_key_env)
     _line("default_model_env", config.frontier.default_model_env)
+
+
+@ai_app.command("doctor")
+def ai_doctor() -> None:
+    """Check the AI environment for the current project."""
+    result = run_ai_doctor(Path("."))
+
+    def _line(label: str, value: str) -> None:
+        typer.echo(f"{label:<30} {value}")
+
+    def _env_line(label: str, var_name: str, present: bool) -> None:
+        status = "PRESENT" if present else "MISSING"
+        typer.echo(f"{label:<30} {var_name:<30} {status}")
+
+    typer.echo("AI Doctor")
+    typer.echo("")
+    typer.echo("--- Configuration ---")
+    _line("aeos.toml", "OK" if result.config_ok else "ERROR")
+
+    if not result.config_ok:
+        typer.echo("")
+        typer.echo("--- Result ---")
+        _line("status", result.status)
+        raise typer.Exit(code=1)
+
+    _line("mode", result.mode)
+    _line("frontier_allowed", str(result.frontier_allowed).lower())
+    _line("require_human_approval", str(result.require_human_approval).lower())
+    typer.echo("")
+    typer.echo("--- Local AI ---")
+    _line("provider", result.local.provider)
+    _line("base_url", result.local.base_url)
+    if result.local.endpoint_ok:
+        endpoint_status = "OK"
+    else:
+        endpoint_status = f"ERROR: {result.local.endpoint_error}"
+    _line("endpoint", endpoint_status)
+    _line("default_model", result.local.default_model)
+    typer.echo("")
+    typer.echo("--- Frontier AI ---")
+    _line("provider", result.frontier.provider)
+    _env_line(
+        "base_url_env",
+        result.frontier.base_url_env,
+        result.frontier.base_url_env_present,
+    )
+    _env_line(
+        "api_key_env",
+        result.frontier.api_key_env,
+        result.frontier.api_key_env_present,
+    )
+    _env_line(
+        "default_model_env",
+        result.frontier.default_model_env,
+        result.frontier.default_model_env_present,
+    )
+    typer.echo("")
+    typer.echo("--- Result ---")
+    _line("status", result.status)
+
+    if result.status == "ERROR":
+        raise typer.Exit(code=1)
