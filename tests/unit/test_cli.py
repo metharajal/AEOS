@@ -164,6 +164,42 @@ def test_onboard_check_default_path(tmp_path: Path) -> None:
     assert "does not exist" not in result.output
 
 
+def test_onboard_json_all_present(tmp_path: Path) -> None:
+    from aeos.onboarding.checker import REQUIRED_ITEMS
+
+    for item, kind in REQUIRED_ITEMS:
+        target = tmp_path / item
+        if kind == "file":
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("")
+        else:
+            target.mkdir(parents=True, exist_ok=True)
+
+    result = runner.invoke(app, ["onboard", str(tmp_path), "--check", "--json"])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data["ok"] is True
+    assert data["missing"] == []
+    assert "README.md" in data["items"]
+    assert data["items"]["README.md"] is True
+
+
+def test_onboard_json_some_missing(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["onboard", str(tmp_path), "--check", "--json"])
+    assert result.exit_code == 1
+    data = json.loads(result.output)
+    assert data["ok"] is False
+    assert "README.md" in data["missing"]
+    assert data["items"]["README.md"] is False
+
+
+def test_onboard_json_path_field(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["onboard", str(tmp_path), "--check", "--json"])
+    assert result.exit_code == 1
+    data = json.loads(result.output)
+    assert data["path"] == str(tmp_path.resolve())
+
+
 def test_onboard_no_check_flag(tmp_path: Path) -> None:
     result = runner.invoke(app, ["onboard", str(tmp_path)])
     assert result.exit_code == 1

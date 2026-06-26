@@ -89,6 +89,7 @@ def init(
 def onboard(
     path: str = typer.Argument(".", help="Path to the project to onboard."),
     check: bool = typer.Option(False, "--check", help="Run in check mode (read-only)."),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
 ) -> None:
     """Onboard an existing project into AEOS."""
     if not check:
@@ -104,14 +105,25 @@ def onboard(
         raise typer.Exit(code=1)
 
     results = check_project(project)
-    missing = False
+    missing_items = [item for item, found in results if not found]
+
+    if as_json:
+        payload = {
+            "path": str(project.resolve()),
+            "ok": len(missing_items) == 0,
+            "items": {item: found for item, found in results},
+            "missing": missing_items,
+        }
+        typer.echo(json.dumps(payload, indent=2))
+        if missing_items:
+            raise typer.Exit(code=1)
+        return
+
     for item, found in results:
         status = "OK     " if found else "MISSING"
         typer.echo(f"{item:<30} {status}")
-        if not found:
-            missing = True
 
-    if missing:
+    if missing_items:
         raise typer.Exit(code=1)
 
 
