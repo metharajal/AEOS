@@ -33,10 +33,10 @@ dependencies = [
 aeos = "aeos.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/metharajal/AI-Foundation-Kit"
-Repository = "https://github.com/metharajal/AI-Foundation-Kit"
-Documentation = "https://github.com/metharajal/AI-Foundation-Kit#readme"
-Changelog = "https://github.com/metharajal/AI-Foundation-Kit/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/metharajal/AEOS"
+Repository = "https://github.com/metharajal/AEOS"
+Documentation = "https://github.com/metharajal/AEOS#readme"
+Changelog = "https://github.com/metharajal/AEOS/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [
