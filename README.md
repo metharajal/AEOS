@@ -1,6 +1,6 @@
-# AI Foundation Kit
+# AEOS — AI Engineering Operating System
 
-AI Foundation Kit is a reusable engineering foundation for building AI-assisted, sovereign, open-source digital products.
+AEOS is a reusable engineering foundation for building AI-assisted, sovereign, open-source digital products.
 
 It provides shared structure, prompts, rules, bootstrap scripts, AI tooling configuration, and engineering playbooks for projects such as E-Mairie, Sama Gox, Legal Trust, and future digital products.
 
