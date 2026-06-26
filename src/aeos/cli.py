@@ -87,7 +87,7 @@ def init(
 
 @app.command()
 def onboard(
-    path: str = typer.Argument(..., help="Path to the project to onboard."),
+    path: str = typer.Argument(".", help="Path to the project to onboard."),
     check: bool = typer.Option(False, "--check", help="Run in check mode (read-only)."),
 ) -> None:
     """Onboard an existing project into AEOS."""

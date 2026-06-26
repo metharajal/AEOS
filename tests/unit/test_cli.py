@@ -154,6 +154,16 @@ def test_onboard_missing_path() -> None:
     assert "does not exist" in result.output
 
 
+def test_onboard_check_default_path(tmp_path: Path) -> None:
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["onboard", "--check"])
+    mp.undo()
+    assert result.exit_code == 1
+    assert "MISSING" in result.output
+    assert "does not exist" not in result.output
+
+
 def test_onboard_no_check_flag(tmp_path: Path) -> None:
     result = runner.invoke(app, ["onboard", str(tmp_path)])
     assert result.exit_code == 1
