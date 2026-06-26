@@ -454,3 +454,87 @@ def test_ai_ask_never_displays_secret(
     result = runner.invoke(app, ["ai", "ask", "test", "--provider", "local"])
     mp.undo()
     assert "sk-should-not-appear" not in result.output
+
+
+def test_ai_ask_frontier_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_minimal_ai_toml_for_cli(tmp_path)
+    monkeypatch.setattr(
+        "aeos.cli.ask_frontier_ai",
+        lambda prompt, config, timeout: __import__(
+            "aeos.ai.frontier", fromlist=["FrontierAiResponse"]
+        ).FrontierAiResponse(text="AEOS est un OS IA."),
+    )
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(
+        app, ["ai", "ask", "Explique AEOS", "--provider", "frontier"]
+    )
+    mp.undo()
+    assert result.exit_code == 0
+    assert "AEOS est un OS IA." in result.output
+
+
+def test_ai_ask_frontier_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _write_minimal_ai_toml_for_cli(tmp_path)
+    from aeos.ai.frontier import FrontierAiError
+
+    monkeypatch.setattr(
+        "aeos.cli.ask_frontier_ai",
+        lambda prompt, config, timeout: (_ for _ in ()).throw(
+            FrontierAiError("frontier unreachable: Connection refused")
+        ),
+    )
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["ai", "ask", "test", "--provider", "frontier"])
+    mp.undo()
+    assert result.exit_code == 1
+
+
+def test_ai_ask_frontier_missing_toml(tmp_path: Path) -> None:
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["ai", "ask", "test", "--provider", "frontier"])
+    mp.undo()
+    assert result.exit_code == 1
+    assert "aeos.toml" in result.output
+
+
+def test_ai_ask_frontier_never_displays_api_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_minimal_ai_toml_for_cli(tmp_path)
+    monkeypatch.setenv("AEOS_FRONTIER_BASE_URL", "https://api.example.com/v1")
+    monkeypatch.setenv("AEOS_FRONTIER_API_KEY", "sk-ultra-secret-frontier-key")
+    monkeypatch.setenv("AEOS_FRONTIER_MODEL", "gpt-4o")
+    monkeypatch.setattr(
+        "aeos.cli.ask_frontier_ai",
+        lambda prompt, config, timeout: __import__(
+            "aeos.ai.frontier", fromlist=["FrontierAiResponse"]
+        ).FrontierAiResponse(text="OK"),
+    )
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["ai", "ask", "test", "--provider", "frontier"])
+    mp.undo()
+    assert "sk-ultra-secret-frontier-key" not in result.output
+
+
+def test_ai_ask_local_still_works_after_frontier(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_minimal_ai_toml_for_cli(tmp_path)
+    monkeypatch.setattr(
+        "aeos.cli.ask_local_ai",
+        lambda prompt, config, timeout: __import__(
+            "aeos.ai.local", fromlist=["LocalAiResponse"]
+        ).LocalAiResponse(text="local still works"),
+    )
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["ai", "ask", "test", "--provider", "local"])
+    mp.undo()
+    assert result.exit_code == 0
+    assert "local still works" in result.output

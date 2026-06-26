@@ -8,6 +8,7 @@ import pytest
 
 from aeos.ai.config import AiConfig, AiFrontierConfig, AiLocalConfig, read_ai_config
 from aeos.ai.doctor import run_ai_doctor
+from aeos.ai.frontier import FrontierAiError, ask_frontier_ai
 from aeos.ai.local import LocalAiError, ask_local_ai
 
 
@@ -231,3 +232,90 @@ def test_ask_local_ai_unsupported_provider() -> None:
     config.local.provider = "lm-studio"
     with pytest.raises(LocalAiError, match="unsupported local provider"):
         ask_local_ai("test", config)
+
+
+def _make_frontier_config() -> AiConfig:
+    return AiConfig(
+        mode="local-first",
+        frontier_allowed=True,
+        require_human_approval=True,
+        local=AiLocalConfig(
+            provider="ollama",
+            base_url="http://localhost:11434",
+            default_model="llama3.2",
+        ),
+        frontier=AiFrontierConfig(
+            provider="openai-compatible",
+            base_url_env="AEOS_FRONTIER_BASE_URL",
+            api_key_env="AEOS_FRONTIER_API_KEY",
+            default_model_env="AEOS_FRONTIER_MODEL",
+        ),
+        source="aeos.toml",
+    )
+
+
+def _fake_frontier_urlopen(
+    response_dict: dict[str, object],
+) -> Callable[..., MagicMock]:
+    def _open(_req: object, **_kwargs: object) -> MagicMock:
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps(response_dict).encode("utf-8")
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        return mock_resp
+
+    return _open
+
+
+def test_ask_frontier_ai_returns_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AEOS_FRONTIER_BASE_URL", "https://api.example.com/v1")
+    monkeypatch.setenv("AEOS_FRONTIER_API_KEY", "sk-test")
+    monkeypatch.setenv("AEOS_FRONTIER_MODEL", "gpt-4o")
+    monkeypatch.setattr(
+        "aeos.ai.frontier.urllib.request.urlopen",
+        _fake_frontier_urlopen(
+            {"choices": [{"message": {"content": "AEOS est un OS IA."}}]}
+        ),
+    )
+    result = ask_frontier_ai("Explique AEOS", _make_frontier_config())
+    assert result.text == "AEOS est un OS IA."
+
+
+def test_ask_frontier_ai_missing_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("AEOS_FRONTIER_BASE_URL", raising=False)
+    monkeypatch.delenv("AEOS_FRONTIER_API_KEY", raising=False)
+    monkeypatch.delenv("AEOS_FRONTIER_MODEL", raising=False)
+    with pytest.raises(FrontierAiError, match="missing environment variables"):
+        ask_frontier_ai("test", _make_frontier_config())
+
+
+def test_ask_frontier_ai_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AEOS_FRONTIER_BASE_URL", "https://api.example.com/v1")
+    monkeypatch.setenv("AEOS_FRONTIER_API_KEY", "sk-test")
+    monkeypatch.setenv("AEOS_FRONTIER_MODEL", "gpt-4o")
+
+    def _raise(_req: object, **_kwargs: object) -> None:
+        raise urllib.error.URLError("Connection refused")
+
+    monkeypatch.setattr("aeos.ai.frontier.urllib.request.urlopen", _raise)
+    with pytest.raises(FrontierAiError, match="frontier unreachable"):
+        ask_frontier_ai("test", _make_frontier_config())
+
+
+def test_ask_frontier_ai_empty_choices(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AEOS_FRONTIER_BASE_URL", "https://api.example.com/v1")
+    monkeypatch.setenv("AEOS_FRONTIER_API_KEY", "sk-test")
+    monkeypatch.setenv("AEOS_FRONTIER_MODEL", "gpt-4o")
+    monkeypatch.setattr(
+        "aeos.ai.frontier.urllib.request.urlopen",
+        _fake_frontier_urlopen({"choices": []}),
+    )
+    with pytest.raises(FrontierAiError, match="empty or invalid"):
+        ask_frontier_ai("test", _make_frontier_config())
+
+
+def test_ask_frontier_ai_unsupported_provider() -> None:
+    config = _make_frontier_config()
+    config.frontier.provider = "anthropic"
+    with pytest.raises(FrontierAiError, match="unsupported frontier provider"):
+        ask_frontier_ai("test", config)
