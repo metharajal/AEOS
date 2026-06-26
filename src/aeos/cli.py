@@ -5,6 +5,7 @@ from typing import Annotated
 
 import typer
 
+from aeos.ai import read_ai_config
 from aeos.generators import GENERATORS
 from aeos.onboarding import check_project
 from aeos.project import inspect_project
@@ -12,7 +13,9 @@ from aeos.version import __version__
 
 app = typer.Typer(add_completion=False)
 project_app = typer.Typer(help="Project management commands.")
+ai_app = typer.Typer(help="AI configuration and orchestration commands.")
 app.add_typer(project_app, name="project")
+app.add_typer(ai_app, name="ai")
 
 REQUIRED_TOOLS = ["python", "uv", "git", "docker", "node", "pnpm", "gh", "code"]
 
@@ -198,3 +201,39 @@ def project_inspect(
     _line("repository", result.git_present)
     remote = result.remote_origin if result.remote_origin else "(none)"
     typer.echo(f"{'remote origin':<30} {remote}")
+
+
+@ai_app.command("config")
+def ai_config() -> None:
+    """Display the effective AI configuration for the current project."""
+    config = read_ai_config(Path("."))
+
+    if config is None:
+        typer.echo(
+            "Error: 'aeos.toml' not found or invalid."
+            " Run 'aeos init' to create a project.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    def _line(label: str, value: str) -> None:
+        typer.echo(f"{label:<30} {value}")
+
+    typer.echo("AI Configuration")
+    typer.echo(f"Source: {config.source}")
+    typer.echo("")
+    typer.echo("--- General ---")
+    _line("mode", config.mode)
+    _line("frontier_allowed", str(config.frontier_allowed).lower())
+    _line("require_human_approval", str(config.require_human_approval).lower())
+    typer.echo("")
+    typer.echo("--- Local ---")
+    _line("provider", config.local.provider)
+    _line("base_url", config.local.base_url)
+    _line("default_model", config.local.default_model)
+    typer.echo("")
+    typer.echo("--- Frontier ---")
+    _line("provider", config.frontier.provider)
+    _line("base_url_env", config.frontier.base_url_env)
+    _line("api_key_env", config.frontier.api_key_env)
+    _line("default_model_env", config.frontier.default_model_env)

@@ -23,3 +23,14 @@ ci = true
 mode = "local-first"
 frontier_allowed = true
 require_human_approval = true
+
+[ai.local]
+provider = "ollama"
+base_url = "http://localhost:11434"
+default_model = "llama3.2"
+
+[ai.frontier]
+provider = "openai-compatible"
+base_url_env = "AEOS_FRONTIER_BASE_URL"
+api_key_env = "AEOS_FRONTIER_API_KEY"
+default_model_env = "AEOS_FRONTIER_MODEL"

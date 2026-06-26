@@ -245,3 +245,59 @@ def test_project_inspect_json_with_aeos_toml(tmp_path: Path) -> None:
     data = json.loads(result.output)
     assert data["project"]["name"] == "my-proj"
     assert data["checks"]["configuration"]["aeos.toml"] is True
+
+
+def test_ai_config_from_toml(tmp_path: Path) -> None:
+    (tmp_path / "aeos.toml").write_text(
+        "\n".join(
+            [
+                "[ai]",
+                'mode = "local-first"',
+                "frontier_allowed = true",
+                "require_human_approval = true",
+                "",
+                "[ai.local]",
+                'provider = "ollama"',
+                'base_url = "http://localhost:11434"',
+                'default_model = "llama3.2"',
+                "",
+                "[ai.frontier]",
+                'provider = "openai-compatible"',
+                'base_url_env = "AEOS_FRONTIER_BASE_URL"',
+                'api_key_env = "AEOS_FRONTIER_API_KEY"',
+                'default_model_env = "AEOS_FRONTIER_MODEL"',
+            ]
+        )
+    )
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["ai", "config"])
+    mp.undo()
+    assert result.exit_code == 0
+    assert "AI Configuration" in result.output
+    assert "Source: aeos.toml" in result.output
+    assert "local-first" in result.output
+    assert "ollama" in result.output
+    assert "AEOS_FRONTIER_API_KEY" in result.output
+
+
+def test_ai_config_defaults(tmp_path: Path) -> None:
+    (tmp_path / "aeos.toml").write_text('[project]\nname = "test"\n')
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["ai", "config"])
+    mp.undo()
+    assert result.exit_code == 0
+    assert "Source: (defaults)" in result.output
+    assert "local-first" in result.output
+    assert "ollama" in result.output
+    assert "AEOS_FRONTIER_API_KEY" in result.output
+
+
+def test_ai_config_missing_toml(tmp_path: Path) -> None:
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["ai", "config"])
+    mp.undo()
+    assert result.exit_code == 1
+    assert "aeos.toml" in result.output
