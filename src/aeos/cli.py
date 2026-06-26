@@ -4,6 +4,8 @@ from typing import Annotated
 
 import typer
 
+from aeos.generators import GENERATORS
+from aeos.onboarding import check_project
 from aeos.version import __version__
 
 app = typer.Typer(add_completion=False)
@@ -50,7 +52,10 @@ def doctor() -> None:
 
 
 @app.command()
-def init(name: str = typer.Argument(..., help="Name of the new project.")) -> None:
+def init(
+    name: str = typer.Argument(..., help="Name of the new project."),
+    project_type: str = typer.Option("basic", "--type", "-t", help="Project type."),
+) -> None:
     """Initialize a new AEOS-compliant project."""
     project = Path(name)
 
@@ -58,31 +63,48 @@ def init(name: str = typer.Argument(..., help="Name of the new project.")) -> No
         typer.echo(f"Error: '{name}' already exists.", err=True)
         raise typer.Exit(code=1)
 
-    dirs = [
-        project / "governance" / "adr",
-        project / "governance" / "rfc",
-        project / "governance" / "dec",
-        project / "governance" / "standards",
-        project / "governance" / "playbooks",
-        project / "docs",
-        project / "src",
-        project / "tests",
-    ]
-    for d in dirs:
-        d.mkdir(parents=True)
+    generator = GENERATORS.get(project_type)
+    if generator is None:
+        available = ", ".join(GENERATORS)
+        typer.echo(
+            f"Error: unknown type '{project_type}'. Available: {available}.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
 
-    (project / "README.md").write_text(f"# {name}\n\nGenerated with AEOS.\n")
-    (project / "aeos.toml").write_text(
-        f'[project]\nname = "{name}"\naeos_version = "{__version__}"\n'
-    )
-    (project / ".gitignore").write_text(".venv/\n__pycache__/\n.DS_Store\n")
+    project.mkdir()
+    created = generator(project, name)
 
     typer.echo(f"Project '{name}' initialized.")
-    typer.echo(f"  {name}/")
-    typer.echo(f"  {name}/README.md")
-    typer.echo(f"  {name}/aeos.toml")
-    typer.echo(f"  {name}/.gitignore")
-    typer.echo(f"  {name}/governance/")
-    typer.echo(f"  {name}/docs/")
-    typer.echo(f"  {name}/src/")
-    typer.echo(f"  {name}/tests/")
+    for item in created:
+        typer.echo(f"  {item}")
+
+
+@app.command()
+def onboard(
+    path: str = typer.Argument(..., help="Path to the project to onboard."),
+    check: bool = typer.Option(False, "--check", help="Run in check mode (read-only)."),
+) -> None:
+    """Onboard an existing project into AEOS."""
+    if not check:
+        typer.echo(
+            "Error: --check is required. Other modes are not available yet.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    project = Path(path)
+    if not project.exists():
+        typer.echo(f"Error: '{path}' does not exist.", err=True)
+        raise typer.Exit(code=1)
+
+    results = check_project(project)
+    missing = False
+    for item, found in results:
+        status = "OK     " if found else "MISSING"
+        typer.echo(f"{item:<30} {status}")
+        if not found:
+            missing = True
+
+    if missing:
+        raise typer.Exit(code=1)

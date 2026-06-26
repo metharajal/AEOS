@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - main
-      - sprint0/foundation
+      - "sprint*/**"
   pull_request:
     branches:
       - main
-      - sprint0/foundation
+      - "sprint*/**"
 
 jobs:
   quality:

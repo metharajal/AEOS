@@ -1,6 +1,7 @@
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from typer.testing import CliRunner
 
 from aeos.cli import REQUIRED_TOOLS, app
@@ -35,9 +36,7 @@ def test_doctor_some_missing() -> None:
     assert "MISSING" in result.output
 
 
-def test_init_creates_project(tmp_path: Path, monkeypatch: object) -> None:
-    import pytest
-
+def test_init_creates_project(tmp_path: Path) -> None:
     mp = pytest.MonkeyPatch()
     mp.chdir(tmp_path)
     result = runner.invoke(app, ["init", "my-project"])
@@ -45,9 +44,8 @@ def test_init_creates_project(tmp_path: Path, monkeypatch: object) -> None:
     assert result.exit_code == 0
     project = tmp_path / "my-project"
     assert project.is_dir()
-    assert (
-        project / "README.md"
-    ).read_text() == "# my-project\n\nGenerated with AEOS.\n"
+    readme = (project / "README.md").read_text()
+    assert readme == "# my-project\n\nGenerated with AEOS.\n"
     assert (project / "aeos.toml").read_text() == (
         '[project]\nname = "my-project"\naeos_version = "0.1.0"\n'
     )
@@ -65,9 +63,26 @@ def test_init_creates_project(tmp_path: Path, monkeypatch: object) -> None:
         assert (project / sub).is_dir()
 
 
-def test_init_fails_if_exists(tmp_path: Path) -> None:
-    import pytest
+def test_init_with_type_basic(tmp_path: Path) -> None:
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["init", "my-project", "--type", "basic"])
+    mp.undo()
+    assert result.exit_code == 0
+    assert (tmp_path / "my-project").is_dir()
+    assert "my-project" in result.output
 
+
+def test_init_with_unknown_type(tmp_path: Path) -> None:
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["init", "my-project", "--type", "unknown"])
+    mp.undo()
+    assert result.exit_code == 1
+    assert "unknown" in result.output
+
+
+def test_init_fails_if_exists(tmp_path: Path) -> None:
     mp = pytest.MonkeyPatch()
     mp.chdir(tmp_path)
     (tmp_path / "existing-project").mkdir()
@@ -75,3 +90,38 @@ def test_init_fails_if_exists(tmp_path: Path) -> None:
     mp.undo()
     assert result.exit_code == 1
     assert "already exists" in result.output
+
+
+def test_onboard_check_all_present(tmp_path: Path) -> None:
+    from aeos.onboarding.checker import REQUIRED_ITEMS
+
+    for item, kind in REQUIRED_ITEMS:
+        target = tmp_path / item
+        if kind == "file":
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("")
+        else:
+            target.mkdir(parents=True, exist_ok=True)
+
+    result = runner.invoke(app, ["onboard", str(tmp_path), "--check"])
+    assert result.exit_code == 0
+    assert "MISSING" not in result.output
+    assert "OK" in result.output
+
+
+def test_onboard_check_some_missing(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["onboard", str(tmp_path), "--check"])
+    assert result.exit_code == 1
+    assert "MISSING" in result.output
+
+
+def test_onboard_missing_path() -> None:
+    result = runner.invoke(app, ["onboard", "missing-project", "--check"])
+    assert result.exit_code == 1
+    assert "does not exist" in result.output
+
+
+def test_onboard_no_check_flag(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["onboard", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "--check" in result.output
