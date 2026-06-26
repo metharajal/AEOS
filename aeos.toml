@@ -1,0 +1,25 @@
+[project]
+name = "AEOS"
+type = "tooling"
+description = "AI Engineering Operating System"
+aeos_version = "0.1.0"
+
+[governance]
+manifesto = "MANIFESTO.md"
+constitution = "CONSTITUTION.md"
+adr_dir = "governance/adr"
+rfc_dir = "governance/rfc"
+dec_dir = "governance/dec"
+standards_dir = "governance/standards"
+playbooks_dir = "governance/playbooks"
+
+[quality]
+ruff = true
+mypy = true
+pytest = true
+ci = true
+
+[ai]
+mode = "local-first"
+frontier_allowed = true
+require_human_approval = true
