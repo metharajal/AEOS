@@ -76,10 +76,11 @@ def init(
         )
         raise typer.Exit(code=1)
 
+    project_name = project.name
     project.mkdir()
-    created = generator(project, name)
+    created = generator(project, project_name)
 
-    typer.echo(f"Project '{name}' initialized.")
+    typer.echo(f"Project '{project_name}' initialized.")
     for item in created:
         typer.echo(f"  {item}")
 

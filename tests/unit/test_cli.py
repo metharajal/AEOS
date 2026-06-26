@@ -103,6 +103,28 @@ def test_init_with_type_python(tmp_path: Path) -> None:
     assert (tmp_path / "demo-api" / "src" / "demo_api" / "version.py").exists()
 
 
+def test_init_with_absolute_path(tmp_path: Path) -> None:
+    dest = tmp_path / "my-project"
+    result = runner.invoke(app, ["init", str(dest)])
+    assert result.exit_code == 0
+    assert dest.is_dir()
+    assert (dest / "README.md").read_text() == "# my-project\n\nGenerated with AEOS.\n"
+    assert 'name = "my-project"' in (dest / "aeos.toml").read_text()
+    assert "my-project" in result.output
+    assert str(dest) not in result.output
+
+
+def test_init_python_with_absolute_path(tmp_path: Path) -> None:
+    dest = tmp_path / "demo-api"
+    result = runner.invoke(app, ["init", str(dest), "--type", "python"])
+    assert result.exit_code == 0
+    assert dest.is_dir()
+    assert (dest / "src" / "demo_api" / "version.py").exists()
+    content = (dest / "pyproject.toml").read_text()
+    assert 'name = "demo-api"' in content
+    assert str(tmp_path) not in content
+
+
 def test_onboard_check_all_present(tmp_path: Path) -> None:
     from aeos.onboarding.checker import REQUIRED_ITEMS
 
