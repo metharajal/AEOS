@@ -1,3 +1,4 @@
+import json
 import shutil
 from pathlib import Path
 from typing import Annotated
@@ -116,10 +117,40 @@ def onboard(
 @project_app.command("inspect")
 def project_inspect(
     path: str = typer.Option(".", "--path", "-p", help="Path to inspect."),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
 ) -> None:
     """Inspect an AEOS project and display a summary."""
     project = Path(path).resolve()
     result = inspect_project(project)
+
+    if as_json:
+        payload = {
+            "project": {"name": result.name, "path": str(result.path)},
+            "checks": {
+                "configuration": {
+                    "aeos.toml": result.aeos_toml,
+                    "pyproject.toml": result.pyproject_toml,
+                },
+                "documentation": {
+                    "README.md": result.readme,
+                    "MANIFESTO.md": result.manifesto,
+                    "CONSTITUTION.md": result.constitution,
+                },
+                "governance": {"governance/": result.governance},
+                "structure": {
+                    "docs/": result.docs,
+                    "src/": result.src,
+                    "tests/": result.tests,
+                },
+                "ci": {".github/workflows/ci.yml": result.ci_yml},
+                "git": {
+                    "repository": result.git_present,
+                    "remote_origin": result.remote_origin,
+                },
+            },
+        }
+        typer.echo(json.dumps(payload, indent=2))
+        return
 
     def _status(found: bool) -> str:
         return "OK" if found else "MISSING"
