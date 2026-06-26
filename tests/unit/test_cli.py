@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -151,3 +152,28 @@ def test_project_inspect_with_path(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "Project:" in result.output
     assert "(unknown)" in result.output
+
+
+def test_project_inspect_json_output(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app, ["project", "inspect", "--json", "--path", str(tmp_path)]
+    )
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert "project" in data
+    assert "checks" in data
+    assert data["project"]["name"] == "(unknown)"
+    assert data["checks"]["configuration"]["aeos.toml"] is False
+    assert "repository" in data["checks"]["git"]
+    assert "remote_origin" in data["checks"]["git"]
+
+
+def test_project_inspect_json_with_aeos_toml(tmp_path: Path) -> None:
+    (tmp_path / "aeos.toml").write_text('[project]\nname = "my-proj"\n')
+    result = runner.invoke(
+        app, ["project", "inspect", "--json", "--path", str(tmp_path)]
+    )
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data["project"]["name"] == "my-proj"
+    assert data["checks"]["configuration"]["aeos.toml"] is True
