@@ -368,3 +368,89 @@ def test_ai_doctor_never_displays_api_key_value(
     result = runner.invoke(app, ["ai", "doctor"])
     mp.undo()
     assert "sk-super-secret-key" not in result.output
+
+
+def _write_minimal_ai_toml_for_cli(tmp_path: Path) -> None:
+    (tmp_path / "aeos.toml").write_text(
+        "\n".join(
+            [
+                "[ai]",
+                'mode = "local-first"',
+                "frontier_allowed = true",
+                "require_human_approval = true",
+                "",
+                "[ai.local]",
+                'provider = "ollama"',
+                'base_url = "http://localhost:11434"',
+                'default_model = "llama3.2"',
+                "",
+                "[ai.frontier]",
+                'provider = "openai-compatible"',
+                'base_url_env = "AEOS_FRONTIER_BASE_URL"',
+                'api_key_env = "AEOS_FRONTIER_API_KEY"',
+                'default_model_env = "AEOS_FRONTIER_MODEL"',
+            ]
+        )
+    )
+
+
+def test_ai_ask_local_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _write_minimal_ai_toml_for_cli(tmp_path)
+    monkeypatch.setattr(
+        "aeos.cli.ask_local_ai",
+        lambda prompt, config, timeout: __import__(
+            "aeos.ai.local", fromlist=["LocalAiResponse"]
+        ).LocalAiResponse(text="AEOS est un système."),
+    )
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["ai", "ask", "Explique AEOS", "--provider", "local"])
+    mp.undo()
+    assert result.exit_code == 0
+    assert "AEOS est un système." in result.output
+
+
+def test_ai_ask_local_ollama_unreachable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_minimal_ai_toml_for_cli(tmp_path)
+    from aeos.ai.local import LocalAiError
+
+    monkeypatch.setattr(
+        "aeos.cli.ask_local_ai",
+        lambda prompt, config, timeout: (_ for _ in ()).throw(
+            LocalAiError("Ollama unreachable: Connection refused")
+        ),
+    )
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["ai", "ask", "test", "--provider", "local"])
+    mp.undo()
+    assert result.exit_code == 1
+
+
+def test_ai_ask_missing_toml(tmp_path: Path) -> None:
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["ai", "ask", "test", "--provider", "local"])
+    mp.undo()
+    assert result.exit_code == 1
+    assert "aeos.toml" in result.output
+
+
+def test_ai_ask_never_displays_secret(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_minimal_ai_toml_for_cli(tmp_path)
+    monkeypatch.setenv("AEOS_FRONTIER_API_KEY", "sk-should-not-appear")
+    monkeypatch.setattr(
+        "aeos.cli.ask_local_ai",
+        lambda prompt, config, timeout: __import__(
+            "aeos.ai.local", fromlist=["LocalAiResponse"]
+        ).LocalAiResponse(text="OK"),
+    )
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["ai", "ask", "test", "--provider", "local"])
+    mp.undo()
+    assert "sk-should-not-appear" not in result.output
