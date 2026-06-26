@@ -7,13 +7,13 @@ build-backend = "hatchling.build"
 # ==============================================================================
 
 [project]
-name = "ai-foundation-kit"
+name = "aeos"
 version = "0.1.0"
-description = "An AI Engineering Operating System for building sovereign, open-source digital products."
+description = "AEOS — AI Engineering Operating System for building sovereign, open-source digital products."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.12"
-authors = [{ name = "AI Foundation Kit Contributors" }]
+authors = [{ name = "AEOS Contributors" }]
 keywords = ["ai", "engineering", "framework", "open-source"]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
@@ -28,10 +28,10 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/ai-foundation-kit/ai-foundation-kit"
-Repository = "https://github.com/ai-foundation-kit/ai-foundation-kit"
-Documentation = "https://ai-foundation-kit.github.io"
-Changelog = "https://github.com/ai-foundation-kit/ai-foundation-kit/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/metharajal/AI-Foundation-Kit"
+Repository = "https://github.com/metharajal/AI-Foundation-Kit"
+Documentation = "https://github.com/metharajal/AI-Foundation-Kit#readme"
+Changelog = "https://github.com/metharajal/AI-Foundation-Kit/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [
@@ -53,7 +53,7 @@ docs = [
 # ==============================================================================
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ai_foundation_kit"]
+packages = ["src/aeos"]
 
 # ==============================================================================
 # Ruff — linter & formatter
@@ -78,7 +78,7 @@ select = [
 ignore = []
 
 [tool.ruff.lint.isort]
-known-first-party = ["ai_foundation_kit"]
+known-first-party = ["aeos"]
 
 [tool.ruff.format]
 quote-style = "double"

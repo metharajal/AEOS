@@ -2,9 +2,9 @@
 
 ## Preamble
 
-This Constitution defines how AI Foundation Kit is governed.
+This Constitution defines how AEOS is governed.
 
-It establishes the principles, responsibilities, and decision-making framework that guide every project built within the AI Foundation Kit ecosystem.
+It establishes the principles, responsibilities, and decision-making framework that guide every project built within the AEOS ecosystem.
 
 It does not describe tools.
 
@@ -18,15 +18,15 @@ Every contributor—human or artificial intelligence—is expected to understand
 
 Every decision, every standard, every playbook, every project, and every architectural record derives its authority from this document.
 
-This Constitution exists to ensure that AI Foundation Kit remains coherent, trustworthy, auditable, and sustainable over time.
+This Constitution exists to ensure that AEOS remains coherent, trustworthy, auditable, and sustainable over time.
 
 ---
 
 ## Part I — Identity
 
-## 1.1 What Is AI Foundation Kit
+## 1.1 What Is AEOS
 
-AI Foundation Kit is an AI Engineering Operating System.
+AEOS is an AI Engineering Operating System.
 
 It is not a software framework.
 
@@ -42,7 +42,7 @@ Every project built within its scope inherits the principles defined by this Con
 
 ## 1.2 The AI Engineering Operating System
 
-AI Foundation Kit defines a complete engineering operating model.
+AEOS defines a complete engineering operating model.
 
 It provides a common language, a common governance model, and a common way of making engineering decisions.
 
@@ -56,7 +56,7 @@ Its stability comes from its principles, not from its technologies.
 
 ## 1.3 Scope of the Ecosystem
 
-This Constitution governs AI Foundation Kit and every project that explicitly adopts it.
+This Constitution governs AEOS and every project that explicitly adopts it.
 
 Projects may extend this Constitution through Standards, Playbooks, RFCs, ADRs, and DECs.
 
@@ -64,7 +64,7 @@ They may not contradict its principles.
 
 The ecosystem is designed to support multiple products, organizations, and engineering teams while preserving a single engineering philosophy.
 
-Any project wishing to depart from these principles must explicitly declare itself outside the AI Foundation Kit ecosystem.
+Any project wishing to depart from these principles must explicitly declare itself outside the AEOS ecosystem.
 
 ---
 
@@ -72,7 +72,7 @@ Any project wishing to depart from these principles must explicitly declare itse
 
 ### 2.1 Engineering First
 
-Engineering is the primary discipline of AI Foundation Kit.
+Engineering is the primary discipline of AEOS.
 
 Technology choices are secondary.
 
@@ -303,7 +303,7 @@ Shared collaboration never implies shared accountability.
 
 ## 4.1 Governance Model
 
-AI Foundation Kit is governed through explicit and documented decisions.
+AEOS is governed through explicit and documented decisions.
 
 Authority exists to preserve coherence, not hierarchy.
 
@@ -355,7 +355,7 @@ Every owner remains accountable to the principles defined by this Constitution.
 
 No contributor—human or artificial intelligence—may override the Constitution, regardless of role, seniority, or technical expertise.
 
-The Constitution is the highest engineering authority within AI Foundation Kit.
+The Constitution is the highest engineering authority within AEOS.
 
 ---
 

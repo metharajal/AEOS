@@ -1,4 +1,4 @@
-from ai_foundation_kit import __version__
+from aeos import __version__
 
 
 def test_version() -> None:

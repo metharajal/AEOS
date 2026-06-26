@@ -1,8 +1,8 @@
 # AI Engineering Manifesto
 
-Copyright (c) AI Foundation Kit Contributors
+Copyright (c) AEOS Contributors
 
-This document defines the philosophical foundation of AI Foundation Kit.
+This document defines the philosophical foundation of AEOS — AI Engineering Operating System.
 
 Every Constitution, Standard, Playbook, ADR, RFC and DEC derives from this Manifesto.
 
@@ -14,7 +14,7 @@ Status: Draft
 
 ## Preamble
 
-This Manifesto is the founding document of AI Foundation Kit.
+This Manifesto is the founding document of AEOS.
 
 It does not describe rules. It does not prescribe processes.
 
@@ -132,7 +132,7 @@ it enables — and the people those projects serve.
 
 ## Scope
 
-*This Manifesto governs AI Foundation Kit and all projects within
+*This Manifesto governs AEOS and all projects within
 its scope. It does not expire. It does not bend to convenience.
 It is the conviction from which everything else is derived.*
 
