@@ -90,3 +90,38 @@ def test_init_fails_if_exists(tmp_path: Path) -> None:
     mp.undo()
     assert result.exit_code == 1
     assert "already exists" in result.output
+
+
+def test_onboard_check_all_present(tmp_path: Path) -> None:
+    from aeos.onboarding.checker import REQUIRED_ITEMS
+
+    for item, kind in REQUIRED_ITEMS:
+        target = tmp_path / item
+        if kind == "file":
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("")
+        else:
+            target.mkdir(parents=True, exist_ok=True)
+
+    result = runner.invoke(app, ["onboard", str(tmp_path), "--check"])
+    assert result.exit_code == 0
+    assert "MISSING" not in result.output
+    assert "OK" in result.output
+
+
+def test_onboard_check_some_missing(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["onboard", str(tmp_path), "--check"])
+    assert result.exit_code == 1
+    assert "MISSING" in result.output
+
+
+def test_onboard_missing_path() -> None:
+    result = runner.invoke(app, ["onboard", "missing-project", "--check"])
+    assert result.exit_code == 1
+    assert "does not exist" in result.output
+
+
+def test_onboard_no_check_flag(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["onboard", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "--check" in result.output
