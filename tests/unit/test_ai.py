@@ -8,8 +8,9 @@ import pytest
 
 from aeos.ai.config import AiConfig, AiFrontierConfig, AiLocalConfig, read_ai_config
 from aeos.ai.doctor import run_ai_doctor
-from aeos.ai.frontier import FrontierAiError, ask_frontier_ai
-from aeos.ai.local import LocalAiError, ask_local_ai
+from aeos.ai.frontier import FrontierAiError, FrontierAiResponse, ask_frontier_ai
+from aeos.ai.local import LocalAiError, LocalAiResponse, ask_local_ai
+from aeos.ai.router import AiRouterError, ask_ai
 
 
 def test_read_ai_config_returns_none_if_no_toml(tmp_path: Path) -> None:
@@ -319,3 +320,133 @@ def test_ask_frontier_ai_unsupported_provider() -> None:
     config.frontier.provider = "anthropic"
     with pytest.raises(FrontierAiError, match="unsupported frontier provider"):
         ask_frontier_ai("test", config)
+
+
+def _make_router_config(
+    frontier_allowed: bool = True,
+    require_human_approval: bool = True,
+) -> AiConfig:
+    return AiConfig(
+        mode="local-first",
+        frontier_allowed=frontier_allowed,
+        require_human_approval=require_human_approval,
+        local=AiLocalConfig(
+            provider="ollama",
+            base_url="http://localhost:11434",
+            default_model="llama3.2",
+        ),
+        frontier=AiFrontierConfig(
+            provider="openai-compatible",
+            base_url_env="AEOS_FRONTIER_BASE_URL",
+            api_key_env="AEOS_FRONTIER_API_KEY",
+            default_model_env="AEOS_FRONTIER_MODEL",
+        ),
+        source="aeos.toml",
+    )
+
+
+def test_ask_ai_local_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "aeos.ai.router.ask_local_ai",
+        lambda p, c, timeout: LocalAiResponse(text="local response"),
+    )
+    result = ask_ai("test", _make_router_config(), provider="local")
+    assert result.text == "local response"
+    assert result.provider_used == "local"
+
+
+def test_ask_ai_local_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "aeos.ai.router.ask_local_ai",
+        lambda p, c, timeout: (_ for _ in ()).throw(LocalAiError("Ollama unreachable")),
+    )
+    with pytest.raises(AiRouterError, match="Ollama unreachable"):
+        ask_ai("test", _make_router_config(), provider="local")
+
+
+def test_ask_ai_frontier_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "aeos.ai.router.ask_frontier_ai",
+        lambda p, c, timeout: FrontierAiResponse(text="frontier response"),
+    )
+    result = ask_ai("test", _make_router_config(), provider="frontier")
+    assert result.text == "frontier response"
+    assert result.provider_used == "frontier"
+
+
+def test_ask_ai_frontier_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "aeos.ai.router.ask_frontier_ai",
+        lambda p, c, timeout: (_ for _ in ()).throw(
+            FrontierAiError("missing env vars")
+        ),
+    )
+    with pytest.raises(AiRouterError, match="missing env vars"):
+        ask_ai("test", _make_router_config(), provider="frontier")
+
+
+def test_ask_ai_auto_local_ok_no_frontier_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    frontier_called = []
+    monkeypatch.setattr(
+        "aeos.ai.router.ask_local_ai",
+        lambda p, c, timeout: LocalAiResponse(text="local ok"),
+    )
+    monkeypatch.setattr(
+        "aeos.ai.router.ask_frontier_ai",
+        lambda p, c, timeout: (
+            frontier_called.append(True)
+            or FrontierAiResponse(text="should not be called")
+        ),
+    )
+    result = ask_ai("test", _make_router_config(), provider="auto")
+    assert result.text == "local ok"
+    assert result.provider_used == "local"
+    assert frontier_called == []
+
+
+def test_ask_ai_auto_local_fails_frontier_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "aeos.ai.router.ask_local_ai",
+        lambda p, c, timeout: (_ for _ in ()).throw(LocalAiError("down")),
+    )
+    config = _make_router_config(frontier_allowed=False)
+    with pytest.raises(AiRouterError, match="frontier is disabled"):
+        ask_ai("test", config, provider="auto")
+
+
+def test_ask_ai_auto_local_fails_require_approval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "aeos.ai.router.ask_local_ai",
+        lambda p, c, timeout: (_ for _ in ()).throw(LocalAiError("down")),
+    )
+    config = _make_router_config(frontier_allowed=True, require_human_approval=True)
+    with pytest.raises(AiRouterError, match="--provider frontier"):
+        ask_ai("test", config, provider="auto")
+
+
+def test_ask_ai_auto_full_fallback_to_frontier(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "aeos.ai.router.ask_local_ai",
+        lambda p, c, timeout: (_ for _ in ()).throw(LocalAiError("down")),
+    )
+    monkeypatch.setattr(
+        "aeos.ai.router.ask_frontier_ai",
+        lambda p, c, timeout: FrontierAiResponse(text="frontier fallback"),
+    )
+    config = _make_router_config(frontier_allowed=True, require_human_approval=False)
+    result = ask_ai("test", config, provider="auto")
+    assert result.text == "frontier fallback"
+    assert result.provider_used == "frontier"
+
+
+def test_ask_ai_unknown_provider() -> None:
+    with pytest.raises(AiRouterError, match="unknown provider"):
+        ask_ai("test", _make_router_config(), provider="magic")
