@@ -361,6 +361,7 @@ def sovereignty_check(
                     "message": f.message,
                     "location": f.location,
                     "recommendation": f.recommendation,
+                    "evidence": f.evidence,
                 }
                 for f in result.findings
             ],
