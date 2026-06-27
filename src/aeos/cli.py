@@ -10,6 +10,7 @@ from aeos.generators import GENERATORS
 from aeos.onboarding import check_project
 from aeos.project import inspect_project
 from aeos.providers.supabase import run_supabase_check
+from aeos.reclaim import run_reclaim_inspect
 from aeos.report import generate_report
 from aeos.security import run_security_check as run_sec_check
 from aeos.sovereignty import run_sovereignty_check
@@ -21,11 +22,13 @@ ai_app = typer.Typer(help="AI configuration and orchestration commands.")
 sovereignty_app = typer.Typer(help="Sovereignty audit commands.")
 security_app = typer.Typer(help="Security audit commands.")
 supabase_app = typer.Typer(help="Supabase integration audit and remediation.")
+reclaim_app = typer.Typer(help="Project reclaim and sovereignty analysis.")
 app.add_typer(project_app, name="project")
 app.add_typer(ai_app, name="ai")
 app.add_typer(sovereignty_app, name="sovereignty")
 app.add_typer(security_app, name="security")
 app.add_typer(supabase_app, name="supabase")
+app.add_typer(reclaim_app, name="reclaim")
 
 REQUIRED_TOOLS = ["python", "uv", "git", "docker", "node", "pnpm", "gh", "code"]
 
@@ -673,4 +676,159 @@ def supabase_check(
 
     typer.echo("")
     if result.status in ("ERROR", "CRITICAL"):
+        raise typer.Exit(code=1)
+
+
+# ---------------------------------------------------------------------------
+# reclaim inspect
+# ---------------------------------------------------------------------------
+
+_CM_DESCRIPTIONS: dict[tuple[str, str], str] = {
+    ("frontend_code", "partial"): "generated code, locally present",
+    ("frontend_code", "controlled"): "local source code",
+    ("backend_runtime", "likely_external"): "no local server/ · providers detected",
+    ("backend_runtime", "controlled"): "local server/ detected",
+    ("database_schema", "partial"): "supabase/migrations/ — runtime external",
+    ("database_schema", "controlled"): "local migrations present",
+    ("database_schema", "missing"): "no schema files found",
+    ("auth", "external"): "external auth provider detected",
+    ("auth", "likely_external"): "Supabase Auth inferred",
+    ("storage", "likely_external"): "external storage inferred",
+    ("secrets_control", "local"): ".gitignore protects · not tracked",
+    ("secrets_control", "external"): ".env currently tracked by Git",
+    ("secrets_exposure", "confirmed"): ".env found in Git history",
+    ("secrets_exposure", "risk"): ".env tracked — risk on next push",
+    ("secrets_exposure", "none"): "no exposure detected",
+    ("deployment", "controlled"): "Dockerfile / docker-compose present",
+    ("deployment", "external"): "cloud deployment config detected",
+    ("deployment", "likely_external"): "no Dockerfile detected",
+}
+
+
+@reclaim_app.command("inspect")
+def reclaim_inspect(
+    path: str = typer.Option(".", "--path", "-p", help="Path to project."),
+    json_output: bool = typer.Option(False, "--json", help="JSON output."),
+) -> None:
+    """Inspect a project for reclaim opportunities (read-only)."""
+    result = run_reclaim_inspect(Path(path))
+
+    if json_output:
+        data = {
+            "path": str(result.path),
+            "status": result.status,
+            "generators": [
+                {"name": g.name, "detected": g.detected, "evidence": g.evidence}
+                for g in result.generators
+            ],
+            "providers": [
+                {
+                    "name": p.name,
+                    "detected": p.detected,
+                    "roles": p.roles,
+                    "evidence": p.evidence,
+                }
+                for p in result.providers
+            ],
+            "control_map": {
+                "frontend_code": result.control_map.frontend_code,
+                "backend_runtime": result.control_map.backend_runtime,
+                "database_schema": result.control_map.database_schema,
+                "auth": result.control_map.auth,
+                "storage": result.control_map.storage,
+                "secrets_control": result.control_map.secrets_control,
+                "secrets_exposure": result.control_map.secrets_exposure,
+                "deployment": result.control_map.deployment,
+                "portability": result.control_map.portability,
+            },
+            "missing_assets": [
+                {
+                    "asset": m.asset,
+                    "impact": m.impact,
+                    "present": m.present,
+                }
+                for m in result.missing_assets
+            ],
+            "exit_options": [
+                {
+                    "id": e.id,
+                    "label": e.label,
+                    "complexity": e.complexity,
+                    "sovereignty": e.sovereignty,
+                    "advantages": e.advantages,
+                    "risks": e.risks,
+                    "next_action": e.next_action,
+                }
+                for e in result.exit_options
+            ],
+            "requires_manual_action": result.requires_manual_action,
+            "recommended_next_action": result.recommended_next_action,
+        }
+        typer.echo(json.dumps(data, indent=2))
+        return
+
+    # ── Text output ──────────────────────────────────────────────────────────
+    typer.echo("Reclaim Inspect")
+    typer.echo(f"Path:   {result.path}")
+    typer.echo(f"Status: {result.status}")
+    typer.echo("")
+
+    typer.echo("── Generator Detection " + "─" * 38)
+    for g in result.generators:
+        tag = "detected ⚠" if g.detected else "not detected"
+        typer.echo(f"  {g.name:<10}  {tag}")
+        if g.detected and g.evidence:
+            typer.echo(f"    Evidence: {g.evidence}")
+    typer.echo("")
+
+    typer.echo("── Provider Detection " + "─" * 39)
+    for p in result.providers:
+        tag = "detected" if p.detected else "not detected"
+        typer.echo(f"  {p.name:<10}  {tag}")
+        if p.detected:
+            if p.roles:
+                typer.echo(f"    Roles:    {' · '.join(p.roles)}")
+            if p.evidence:
+                typer.echo(f"    Evidence: {p.evidence}")
+    typer.echo("")
+
+    typer.echo("── Control Map " + "─" * 45)
+    cm = result.control_map
+    cm_rows = [
+        ("Frontend code", cm.frontend_code),
+        ("Backend runtime", cm.backend_runtime),
+        ("Database schema", cm.database_schema),
+        ("Auth", cm.auth),
+        ("Storage", cm.storage),
+        ("Secrets control", cm.secrets_control),
+        ("Secrets exposure", cm.secrets_exposure),
+        ("Deployment", cm.deployment),
+        ("Portability", cm.portability),
+    ]
+    for label, value in cm_rows:
+        desc = _CM_DESCRIPTIONS.get((label.lower().replace(" ", "_"), value), "")
+        line = f"  {label:<18}  {value:<18}"
+        if desc:
+            line += f"  ({desc})"
+        typer.echo(line)
+    typer.echo("")
+
+    typer.echo("── Missing Local Assets " + "─" * 37)
+    for m in result.missing_assets:
+        if m.present:
+            typer.echo(f"  {m.asset:<24}  present ✓")
+        else:
+            typer.echo(f"  {m.asset:<24}  missing  → {m.impact}")
+    typer.echo("")
+
+    typer.echo("── Exit Options " + "─" * 44)
+    for i, opt in enumerate(result.exit_options, start=1):
+        typer.echo(f"  {i}. [{opt.complexity:<9} / {opt.sovereignty:<9}] {opt.label}")
+        typer.echo(f"     Next: {opt.next_action}")
+    typer.echo("")
+
+    typer.echo("── Recommended Next Action " + "─" * 33)
+    typer.echo(f"  → {result.recommended_next_action}")
+
+    if result.status == "ERROR":
         raise typer.Exit(code=1)
