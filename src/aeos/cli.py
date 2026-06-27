@@ -9,6 +9,7 @@ from aeos.ai import AiRouterError, ask_ai, read_ai_config, run_ai_doctor
 from aeos.generators import GENERATORS
 from aeos.onboarding import check_project
 from aeos.project import inspect_project
+from aeos.report import generate_report
 from aeos.security import run_security_check as run_sec_check
 from aeos.sovereignty import run_sovereignty_check
 from aeos.version import __version__
@@ -446,5 +447,124 @@ def security_check(
             typer.echo(f"    Evidence:       {f.evidence}")
         typer.echo("")
 
+    if result.status == "ERROR":
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def report(
+    path: str = typer.Option(".", "--path", "-p", help="Path to audit."),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Generate a global AEOS project report."""
+    project = Path(path).resolve()
+    if not project.is_dir():
+        typer.echo(f"Error: '{path}' does not exist.", err=True)
+        raise typer.Exit(code=1)
+
+    result = generate_report(project)
+
+    if as_json:
+        payload = {
+            "path": str(result.path),
+            "status": result.status,
+            "sections": {
+                name: {
+                    "status": sec.status,
+                    "summary": sec.summary,
+                    "details": sec.details,
+                }
+                for name, sec in result.sections.items()
+            },
+            "top_risks": [
+                {
+                    "severity": r.severity,
+                    "category": r.category,
+                    "message": r.message,
+                    "location": r.location,
+                }
+                for r in result.top_risks
+            ],
+            "recommendations": [
+                {"priority": r.priority, "action": r.action}
+                for r in result.recommendations
+            ],
+        }
+        typer.echo(json.dumps(payload, indent=2))
+        if result.status == "ERROR":
+            raise typer.Exit(code=1)
+        return
+
+    typer.echo("AEOS Project Report")
+    typer.echo(f"Path:   {result.path}")
+    typer.echo(f"Status: {result.status}")
+
+    # Project section
+    proj = result.sections["project"]
+    d = proj.details
+    typer.echo("\n── Project ──────────────────────────────────────")
+    typer.echo(f"  Status: {proj.status}")
+    typer.echo(f"  Name:   {d.get('name', '(unknown)')}")
+    if d.get("remote_origin"):
+        typer.echo(f"  Remote: {d['remote_origin']}")
+    for key, label in [
+        ("aeos_toml", "aeos.toml"),
+        ("pyproject_toml", "pyproject.toml"),
+        ("readme", "README.md"),
+        ("src", "src/"),
+        ("tests", "tests/"),
+        ("docs", "docs/"),
+        ("ci_yml", ".github/workflows/ci.yml"),
+    ]:
+        val = "OK" if d.get(key) else "MISSING"
+        typer.echo(f"  {label:<32} {val}")
+
+    # Governance section
+    gov = result.sections["governance"]
+    gd = gov.details
+    typer.echo("\n── Governance ───────────────────────────────────")
+    typer.echo(f"  Status: {gov.status}")
+    typer.echo(f"  Items:  {gd.get('present', 0)}/{gd.get('total', 0)} present")
+    gov_missing = gd.get("missing", [])
+    if isinstance(gov_missing, list) and gov_missing:
+        typer.echo(f"  Missing: {', '.join(str(m) for m in gov_missing)}")
+
+    # Sovereignty section
+    sov = result.sections["sovereignty"]
+    sd = sov.details
+    typer.echo("\n── Sovereignty ──────────────────────────────────")
+    typer.echo(f"  Status:   {sov.status}")
+    typer.echo(
+        f"  Findings: {sd.get('findings_count', 0)}"
+        f"  ({sd.get('error_count', 0)} ERROR"
+        f" · {sd.get('warning_count', 0)} WARNING)"
+    )
+
+    # Security section
+    sec = result.sections["security"]
+    secd = sec.details
+    typer.echo("\n── Security ─────────────────────────────────────")
+    typer.echo(f"  Status:   {sec.status}")
+    typer.echo(
+        f"  Findings: {secd.get('findings_count', 0)}"
+        f"  ({secd.get('error_count', 0)} ERROR"
+        f" · {secd.get('warning_count', 0)} WARNING)"
+    )
+
+    # Top risks
+    typer.echo("\n── Top Risks ────────────────────────────────────")
+    if result.top_risks:
+        for i, risk in enumerate(result.top_risks, start=1):
+            typer.echo(f"  {i}. [{risk.severity}] [{risk.category}] {risk.message}")
+            typer.echo(f"     Location: {risk.location}")
+    else:
+        typer.echo("  No critical risks detected.")
+
+    # Recommended next actions
+    typer.echo("\n── Recommended Next Actions ─────────────────────")
+    for rec in result.recommendations:
+        typer.echo(f"  {rec.priority}. {rec.action}")
+
+    typer.echo("")
     if result.status == "ERROR":
         raise typer.Exit(code=1)
