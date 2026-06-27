@@ -9,6 +9,7 @@ from aeos.ai import AiRouterError, ask_ai, read_ai_config, run_ai_doctor
 from aeos.generators import GENERATORS
 from aeos.onboarding import check_project
 from aeos.project import inspect_project
+from aeos.providers.supabase import run_supabase_check
 from aeos.report import generate_report
 from aeos.security import run_security_check as run_sec_check
 from aeos.sovereignty import run_sovereignty_check
@@ -19,10 +20,12 @@ project_app = typer.Typer(help="Project management commands.")
 ai_app = typer.Typer(help="AI configuration and orchestration commands.")
 sovereignty_app = typer.Typer(help="Sovereignty audit commands.")
 security_app = typer.Typer(help="Security audit commands.")
+supabase_app = typer.Typer(help="Supabase integration audit and remediation.")
 app.add_typer(project_app, name="project")
 app.add_typer(ai_app, name="ai")
 app.add_typer(sovereignty_app, name="sovereignty")
 app.add_typer(security_app, name="security")
+app.add_typer(supabase_app, name="supabase")
 
 REQUIRED_TOOLS = ["python", "uv", "git", "docker", "node", "pnpm", "gh", "code"]
 
@@ -567,4 +570,107 @@ def report(
 
     typer.echo("")
     if result.status == "ERROR":
+        raise typer.Exit(code=1)
+
+
+@supabase_app.command("check")
+def supabase_check(
+    path: str = typer.Option(".", "--path", "-p", help="Path to audit."),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Audit Supabase integration and produce a local remediation plan."""
+    project = Path(path).resolve()
+    if not project.is_dir():
+        typer.echo(f"Error: '{path}' does not exist.", err=True)
+        raise typer.Exit(code=1)
+
+    result = run_supabase_check(project)
+
+    if as_json:
+        payload = {
+            "path": str(result.path),
+            "status": result.status,
+            "supabase_detected": result.supabase_detected,
+            "key_risks": [
+                {
+                    "variable_name": r.variable_name,
+                    "key_type": r.key_type,
+                    "severity": r.severity,
+                    "in_git_history": r.in_git_history,
+                    "in_current_tracking": r.in_current_tracking,
+                }
+                for r in result.key_risks
+            ],
+            "rls_evidence": {
+                "migrations_present": result.rls_evidence.migrations_present,
+                "rls_enable_found": result.rls_evidence.rls_enable_found,
+                "policies_found": result.rls_evidence.policies_found,
+                "evidence": result.rls_evidence.evidence,
+            },
+            "local_fixes": {
+                "gitignore_protects_env": result.local_fixes.gitignore_protects_env,
+                "env_not_tracked": result.local_fixes.env_not_tracked,
+                "env_example_exists": result.local_fixes.env_example_exists,
+            },
+            "remediation_steps": [
+                {
+                    "priority": s.priority,
+                    "action": s.action,
+                    "status": s.status,
+                    "location": s.location,
+                }
+                for s in result.remediation_steps
+            ],
+            "requires_manual_action": result.requires_manual_action,
+        }
+        typer.echo(json.dumps(payload, indent=2))
+        if result.status in ("ERROR", "CRITICAL"):
+            raise typer.Exit(code=1)
+        return
+
+    typer.echo("Supabase Check")
+    typer.echo(f"Path:   {result.path}")
+    typer.echo(f"Status: {result.status}")
+
+    if not result.supabase_detected:
+        typer.echo("")
+        typer.echo("Supabase not detected in this project.")
+        return
+
+    typer.echo("Supabase detected: yes")
+
+    if result.key_risks:
+        typer.echo(f"\nKey Risks ({len(result.key_risks)}):\n")
+        for r in result.key_risks:
+            history = "yes" if r.in_git_history else "no"
+            tracked = "yes" if r.in_current_tracking else "no"
+            typer.echo(f"  [{r.key_type}] {r.severity} — {r.variable_name}")
+            typer.echo(f"    In Git history:    {history}")
+            typer.echo(f"    Currently tracked: {tracked}")
+            typer.echo("")
+
+    rls = result.rls_evidence
+    typer.echo("RLS Evidence:")
+    typer.echo(f"  Migrations present: {'yes' if rls.migrations_present else 'no'}")
+    typer.echo(f"  RLS enable found:   {'yes' if rls.rls_enable_found else 'no'}")
+    typer.echo(f"  Policies found:     {'yes' if rls.policies_found else 'no'}")
+    if rls.evidence:
+        typer.echo(f"  Evidence:           {rls.evidence}")
+
+    lf = result.local_fixes
+    typer.echo("\nLocal Fixes:")
+    gitignore_ok = "yes ✓" if lf.gitignore_protects_env else "no ✗"
+    tracked_ok = "yes ✓" if lf.env_not_tracked else "no ✗"
+    example_ok = "yes ✓" if lf.env_example_exists else "no ✗"
+    typer.echo(f"  .gitignore protects .env: {gitignore_ok}")
+    typer.echo(f"  .env not tracked:         {tracked_ok}")
+    typer.echo(f"  .env.example exists:      {example_ok}")
+
+    typer.echo("\nRemediation Steps:")
+    for step in result.remediation_steps:
+        typer.echo(f"  {step.priority}. [{step.status:<8}] {step.action}")
+        typer.echo(f"              → {step.location}")
+
+    typer.echo("")
+    if result.status in ("ERROR", "CRITICAL"):
         raise typer.Exit(code=1)
