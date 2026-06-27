@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 from typer.testing import CliRunner
 
+from aeos.ai.router import AiRouterError, AiRouterResponse
 from aeos.cli import REQUIRED_TOOLS, app
 
 runner = CliRunner()
@@ -394,13 +395,21 @@ def _write_minimal_ai_toml_for_cli(tmp_path: Path) -> None:
     )
 
 
+def _mock_ask_ai_local(text: str = "local response") -> AiRouterResponse:
+    return AiRouterResponse(text=text, provider_used="local")
+
+
+def _mock_ask_ai_frontier(text: str = "frontier response") -> AiRouterResponse:
+    return AiRouterResponse(text=text, provider_used="frontier")
+
+
 def test_ai_ask_local_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _write_minimal_ai_toml_for_cli(tmp_path)
     monkeypatch.setattr(
-        "aeos.cli.ask_local_ai",
-        lambda prompt, config, timeout: __import__(
-            "aeos.ai.local", fromlist=["LocalAiResponse"]
-        ).LocalAiResponse(text="AEOS est un système."),
+        "aeos.cli.ask_ai",
+        lambda prompt, config, provider, timeout: _mock_ask_ai_local(
+            "AEOS est un système."
+        ),
     )
     mp = pytest.MonkeyPatch()
     mp.chdir(tmp_path)
@@ -414,12 +423,10 @@ def test_ai_ask_local_ollama_unreachable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _write_minimal_ai_toml_for_cli(tmp_path)
-    from aeos.ai.local import LocalAiError
-
     monkeypatch.setattr(
-        "aeos.cli.ask_local_ai",
-        lambda prompt, config, timeout: (_ for _ in ()).throw(
-            LocalAiError("Ollama unreachable: Connection refused")
+        "aeos.cli.ask_ai",
+        lambda prompt, config, provider, timeout: (_ for _ in ()).throw(
+            AiRouterError("Ollama unreachable: Connection refused")
         ),
     )
     mp = pytest.MonkeyPatch()
@@ -444,10 +451,8 @@ def test_ai_ask_never_displays_secret(
     _write_minimal_ai_toml_for_cli(tmp_path)
     monkeypatch.setenv("AEOS_FRONTIER_API_KEY", "sk-should-not-appear")
     monkeypatch.setattr(
-        "aeos.cli.ask_local_ai",
-        lambda prompt, config, timeout: __import__(
-            "aeos.ai.local", fromlist=["LocalAiResponse"]
-        ).LocalAiResponse(text="OK"),
+        "aeos.cli.ask_ai",
+        lambda prompt, config, provider, timeout: _mock_ask_ai_local("OK"),
     )
     mp = pytest.MonkeyPatch()
     mp.chdir(tmp_path)
@@ -461,10 +466,10 @@ def test_ai_ask_frontier_success(
 ) -> None:
     _write_minimal_ai_toml_for_cli(tmp_path)
     monkeypatch.setattr(
-        "aeos.cli.ask_frontier_ai",
-        lambda prompt, config, timeout: __import__(
-            "aeos.ai.frontier", fromlist=["FrontierAiResponse"]
-        ).FrontierAiResponse(text="AEOS est un OS IA."),
+        "aeos.cli.ask_ai",
+        lambda prompt, config, provider, timeout: _mock_ask_ai_frontier(
+            "AEOS est un OS IA."
+        ),
     )
     mp = pytest.MonkeyPatch()
     mp.chdir(tmp_path)
@@ -478,12 +483,10 @@ def test_ai_ask_frontier_success(
 
 def test_ai_ask_frontier_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _write_minimal_ai_toml_for_cli(tmp_path)
-    from aeos.ai.frontier import FrontierAiError
-
     monkeypatch.setattr(
-        "aeos.cli.ask_frontier_ai",
-        lambda prompt, config, timeout: (_ for _ in ()).throw(
-            FrontierAiError("frontier unreachable: Connection refused")
+        "aeos.cli.ask_ai",
+        lambda prompt, config, provider, timeout: (_ for _ in ()).throw(
+            AiRouterError("frontier unreachable: Connection refused")
         ),
     )
     mp = pytest.MonkeyPatch()
@@ -506,14 +509,10 @@ def test_ai_ask_frontier_never_displays_api_key(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _write_minimal_ai_toml_for_cli(tmp_path)
-    monkeypatch.setenv("AEOS_FRONTIER_BASE_URL", "https://api.example.com/v1")
     monkeypatch.setenv("AEOS_FRONTIER_API_KEY", "sk-ultra-secret-frontier-key")
-    monkeypatch.setenv("AEOS_FRONTIER_MODEL", "gpt-4o")
     monkeypatch.setattr(
-        "aeos.cli.ask_frontier_ai",
-        lambda prompt, config, timeout: __import__(
-            "aeos.ai.frontier", fromlist=["FrontierAiResponse"]
-        ).FrontierAiResponse(text="OK"),
+        "aeos.cli.ask_ai",
+        lambda prompt, config, provider, timeout: _mock_ask_ai_frontier("OK"),
     )
     mp = pytest.MonkeyPatch()
     mp.chdir(tmp_path)
@@ -522,19 +521,86 @@ def test_ai_ask_frontier_never_displays_api_key(
     assert "sk-ultra-secret-frontier-key" not in result.output
 
 
-def test_ai_ask_local_still_works_after_frontier(
+def test_ai_ask_no_provider_uses_local(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_minimal_ai_toml_for_cli(tmp_path)
+    provider_used_capture: list[str] = []
+    monkeypatch.setattr(
+        "aeos.cli.ask_ai",
+        lambda prompt, config, provider, timeout: (
+            provider_used_capture.append(provider)
+            or _mock_ask_ai_local("default local")
+        ),
+    )
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["ai", "ask", "test"])
+    mp.undo()
+    assert result.exit_code == 0
+    assert provider_used_capture == ["local"]
+    assert "default local" in result.output
+
+
+def test_ai_ask_auto_local_ok(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _write_minimal_ai_toml_for_cli(tmp_path)
+    monkeypatch.setattr(
+        "aeos.cli.ask_ai",
+        lambda prompt, config, provider, timeout: _mock_ask_ai_local("auto local ok"),
+    )
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["ai", "ask", "test", "--provider", "auto"])
+    mp.undo()
+    assert result.exit_code == 0
+    assert "Used provider: local" in result.output
+    assert "auto local ok" in result.output
+
+
+def test_ai_ask_auto_require_approval_blocks_frontier(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _write_minimal_ai_toml_for_cli(tmp_path)
     monkeypatch.setattr(
-        "aeos.cli.ask_local_ai",
-        lambda prompt, config, timeout: __import__(
-            "aeos.ai.local", fromlist=["LocalAiResponse"]
-        ).LocalAiResponse(text="local still works"),
+        "aeos.cli.ask_ai",
+        lambda prompt, config, provider, timeout: (_ for _ in ()).throw(
+            AiRouterError(
+                "local failed; use --provider frontier to call frontier explicitly"
+            )
+        ),
     )
     mp = pytest.MonkeyPatch()
     mp.chdir(tmp_path)
-    result = runner.invoke(app, ["ai", "ask", "test", "--provider", "local"])
+    result = runner.invoke(app, ["ai", "ask", "test", "--provider", "auto"])
+    mp.undo()
+    assert result.exit_code == 1
+    assert "--provider frontier" in result.output
+
+
+def test_ai_ask_auto_frontier_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_minimal_ai_toml_for_cli(tmp_path)
+    monkeypatch.setattr(
+        "aeos.cli.ask_ai",
+        lambda prompt, config, provider, timeout: _mock_ask_ai_frontier(
+            "frontier fallback response"
+        ),
+    )
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["ai", "ask", "test", "--provider", "auto"])
     mp.undo()
     assert result.exit_code == 0
-    assert "local still works" in result.output
+    assert "Used provider: frontier" in result.output
+    assert "frontier fallback response" in result.output
+
+
+def test_ai_ask_invalid_provider(tmp_path: Path) -> None:
+    _write_minimal_ai_toml_for_cli(tmp_path)
+    mp = pytest.MonkeyPatch()
+    mp.chdir(tmp_path)
+    result = runner.invoke(app, ["ai", "ask", "test", "--provider", "unknown"])
+    mp.undo()
+    assert result.exit_code == 1
+    assert "unknown" in result.output

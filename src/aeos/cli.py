@@ -5,14 +5,7 @@ from typing import Annotated
 
 import typer
 
-from aeos.ai import (
-    FrontierAiError,
-    LocalAiError,
-    ask_frontier_ai,
-    ask_local_ai,
-    read_ai_config,
-    run_ai_doctor,
-)
+from aeos.ai import AiRouterError, ask_ai, read_ai_config, run_ai_doctor
 from aeos.generators import GENERATORS
 from aeos.onboarding import check_project
 from aeos.project import inspect_project
@@ -311,20 +304,14 @@ def ai_doctor() -> None:
 @ai_app.command("ask")
 def ai_ask(
     prompt: str = typer.Argument(..., help="Prompt to send to the AI provider."),
-    provider: str = typer.Option("local", "--provider", help="AI provider to use."),
+    provider: str = typer.Option(
+        "local", "--provider", help="AI provider: local, frontier, auto."
+    ),
     timeout: int = typer.Option(30, "--timeout", help="Request timeout in seconds."),
 ) -> None:
-    """Send a prompt to the configured AI provider (local or frontier)."""
+    """Send a prompt to the configured AI provider (local, frontier, or auto)."""
     if not prompt.strip():
         typer.echo("Error: prompt cannot be empty.", err=True)
-        raise typer.Exit(code=1)
-
-    if provider not in ("local", "frontier"):
-        typer.echo(
-            f"Error: provider '{provider}' is not supported."
-            " Use --provider local or --provider frontier.",
-            err=True,
-        )
         raise typer.Exit(code=1)
 
     config = read_ai_config(Path("."))
@@ -336,17 +323,12 @@ def ai_ask(
         )
         raise typer.Exit(code=1)
 
-    if provider == "local":
-        try:
-            local_response = ask_local_ai(prompt, config, timeout=timeout)
-        except LocalAiError as e:
-            typer.echo(f"Error: {e}", err=True)
-            raise typer.Exit(code=1) from None
-        typer.echo(local_response.text)
-    else:
-        try:
-            frontier_response = ask_frontier_ai(prompt, config, timeout=timeout)
-        except FrontierAiError as e:
-            typer.echo(f"Error: {e}", err=True)
-            raise typer.Exit(code=1) from None
-        typer.echo(frontier_response.text)
+    try:
+        response = ask_ai(prompt, config, provider=provider, timeout=timeout)
+    except AiRouterError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(code=1) from None
+
+    if provider == "auto":
+        typer.echo(f"Used provider: {response.provider_used}")
+    typer.echo(response.text)
