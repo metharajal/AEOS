@@ -1,5 +1,5 @@
-import { supabase } from './lib/supabase'
-import { ClerkProvider } from './lib/auth'
+import { supabase } from './supabase'
+import { ClerkProvider } from './auth'
 
 export default function App() {
   return (

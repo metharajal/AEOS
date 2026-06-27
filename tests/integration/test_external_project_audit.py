@@ -44,6 +44,15 @@ def _fingerprint(directory: Path) -> dict[str, int]:
 def ext_project(tmp_path: Path) -> Path:
     dest = tmp_path / "lovable_project"
     shutil.copytree(FIXTURE_DIR, dest)
+    # .env is gitignored in the AEOS repo — create it at test runtime so it
+    # exists on CI exactly as it would in a real project cloned locally.
+    (dest / ".env").write_text(
+        "# Test fixture — values are fake placeholders, not real credentials\n"
+        "NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co\n"
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key-here\n"
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your-clerk-publishable-key-here\n"
+        "STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key-here\n"
+    )
     return dest
 
 
