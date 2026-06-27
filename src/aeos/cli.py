@@ -9,13 +9,16 @@ from aeos.ai import AiRouterError, ask_ai, read_ai_config, run_ai_doctor
 from aeos.generators import GENERATORS
 from aeos.onboarding import check_project
 from aeos.project import inspect_project
+from aeos.sovereignty import run_sovereignty_check
 from aeos.version import __version__
 
 app = typer.Typer(add_completion=False)
 project_app = typer.Typer(help="Project management commands.")
 ai_app = typer.Typer(help="AI configuration and orchestration commands.")
+sovereignty_app = typer.Typer(help="Sovereignty audit commands.")
 app.add_typer(project_app, name="project")
 app.add_typer(ai_app, name="ai")
+app.add_typer(sovereignty_app, name="sovereignty")
 
 REQUIRED_TOOLS = ["python", "uv", "git", "docker", "node", "pnpm", "gh", "code"]
 
@@ -332,3 +335,56 @@ def ai_ask(
     if provider == "auto":
         typer.echo(f"Used provider: {response.provider_used}")
     typer.echo(response.text)
+
+
+@sovereignty_app.command("check")
+def sovereignty_check(
+    path: str = typer.Option(".", "--path", "-p", help="Path to audit."),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Audit a project for sovereignty and external dependency risks."""
+    project = Path(path).resolve()
+    if not project.is_dir():
+        typer.echo(f"Error: '{path}' does not exist.", err=True)
+        raise typer.Exit(code=1)
+
+    result = run_sovereignty_check(project)
+
+    if as_json:
+        payload = {
+            "path": str(result.path),
+            "status": result.status,
+            "findings": [
+                {
+                    "category": f.category,
+                    "severity": f.severity,
+                    "message": f.message,
+                    "location": f.location,
+                    "recommendation": f.recommendation,
+                }
+                for f in result.findings
+            ],
+        }
+        typer.echo(json.dumps(payload, indent=2))
+        if result.status == "ERROR":
+            raise typer.Exit(code=1)
+        return
+
+    typer.echo("Sovereignty Check")
+    typer.echo(f"Path:   {result.path}")
+    typer.echo(f"Status: {result.status}")
+
+    if not result.findings:
+        typer.echo("")
+        typer.echo("No issues found.")
+        return
+
+    typer.echo(f"\nFindings ({len(result.findings)}):\n")
+    for f in result.findings:
+        typer.echo(f"  [{f.category}] {f.severity} — {f.message}")
+        typer.echo(f"    Location:       {f.location}")
+        typer.echo(f"    Recommendation: {f.recommendation}")
+        typer.echo("")
+
+    if result.status == "ERROR":
+        raise typer.Exit(code=1)
