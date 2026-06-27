@@ -137,20 +137,20 @@ def test_onboard_check_all_present(tmp_path: Path) -> None:
         else:
             target.mkdir(parents=True, exist_ok=True)
 
-    result = runner.invoke(app, ["onboard", str(tmp_path), "--check"])
+    result = runner.invoke(app, ["onboard", "--check", "--path", str(tmp_path)])
     assert result.exit_code == 0
     assert "MISSING" not in result.output
     assert "OK" in result.output
 
 
 def test_onboard_check_some_missing(tmp_path: Path) -> None:
-    result = runner.invoke(app, ["onboard", str(tmp_path), "--check"])
+    result = runner.invoke(app, ["onboard", "--check", "--path", str(tmp_path)])
     assert result.exit_code == 1
     assert "MISSING" in result.output
 
 
 def test_onboard_missing_path() -> None:
-    result = runner.invoke(app, ["onboard", "missing-project", "--check"])
+    result = runner.invoke(app, ["onboard", "--check", "--path", "missing-project"])
     assert result.exit_code == 1
     assert "does not exist" in result.output
 
@@ -176,7 +176,9 @@ def test_onboard_json_all_present(tmp_path: Path) -> None:
         else:
             target.mkdir(parents=True, exist_ok=True)
 
-    result = runner.invoke(app, ["onboard", str(tmp_path), "--check", "--json"])
+    result = runner.invoke(
+        app, ["onboard", "--check", "--path", str(tmp_path), "--json"]
+    )
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["ok"] is True
@@ -186,7 +188,9 @@ def test_onboard_json_all_present(tmp_path: Path) -> None:
 
 
 def test_onboard_json_some_missing(tmp_path: Path) -> None:
-    result = runner.invoke(app, ["onboard", str(tmp_path), "--check", "--json"])
+    result = runner.invoke(
+        app, ["onboard", "--check", "--path", str(tmp_path), "--json"]
+    )
     assert result.exit_code == 1
     data = json.loads(result.output)
     assert data["ok"] is False
@@ -195,14 +199,16 @@ def test_onboard_json_some_missing(tmp_path: Path) -> None:
 
 
 def test_onboard_json_path_field(tmp_path: Path) -> None:
-    result = runner.invoke(app, ["onboard", str(tmp_path), "--check", "--json"])
+    result = runner.invoke(
+        app, ["onboard", "--check", "--path", str(tmp_path), "--json"]
+    )
     assert result.exit_code == 1
     data = json.loads(result.output)
     assert data["path"] == str(tmp_path.resolve())
 
 
 def test_onboard_no_check_flag(tmp_path: Path) -> None:
-    result = runner.invoke(app, ["onboard", str(tmp_path)])
+    result = runner.invoke(app, ["onboard", "--path", str(tmp_path)])
     assert result.exit_code == 1
     assert "--check" in result.output
 

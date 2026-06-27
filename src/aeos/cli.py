@@ -97,7 +97,7 @@ def init(
 
 @app.command()
 def onboard(
-    path: str = typer.Argument(".", help="Path to the project to onboard."),
+    path: str = typer.Option(".", "--path", "-p", help="Path to audit."),
     check: bool = typer.Option(False, "--check", help="Run in check mode (read-only)."),
     as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
 ) -> None:
@@ -109,8 +109,8 @@ def onboard(
         )
         raise typer.Exit(code=1)
 
-    project = Path(path)
-    if not project.exists():
+    project = Path(path).resolve()
+    if not project.is_dir():
         typer.echo(f"Error: '{path}' does not exist.", err=True)
         raise typer.Exit(code=1)
 
