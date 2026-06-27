@@ -15,7 +15,7 @@ AEOS exists at the intersection of three forces:
 - **Hosted platforms capture the stack behind every generated project.**
 - **Local AI is now capable enough to handle most engineering tasks at near-zero marginal cost.**
 
-AEOS is the engineering operating system that bridges all three: it helps you create, reclaim, and evolve software products built with AI — while keeping control of the code, the data, the infrastructure, the models, the costs, and the sovereignty.
+AEOS is the engineering operating system that bridges all three: it helps you create, reclaim, evolve, and modernize software products built with AI — while keeping control of the code, the data, the infrastructure, the models, the costs, and the sovereignty.
 
 ---
 
@@ -61,8 +61,13 @@ This is the founding sentence of AEOS. It defines three product paths that mirro
 - **Path A — Build from scratch**: start the next project right, with sovereignty and quality from the first commit.
 - **Path B — Reclaim existing AI-generated projects**: audit, harden, and migrate projects already built with Lovable, Bolt, Replit, Supabase, or similar tools.
 - **Path C — Evolve locally with low token dependency**: continue developing with local AI models, at near-zero marginal cost, with frontier reserved for the genuinely complex tasks.
+- **Path D — Modernize and migrate existing applications**: audit, map, and guide the progressive modernization of legacy monolithic systems — without promising magic automation.
 
 AEOS is not a theoretical framework. It is the tool the founder needed and could not find.
+
+A fourth path has emerged since: many organizations — especially in Africa — are not building from scratch. They are sitting on legacy monolithic systems they do not fully understand, cannot easily maintain, and cannot afford to migrate incorrectly. Path D addresses this reality.
+
+AEOS helps create, reclaim, modernize, and evolve digital products with AI — while keeping technical, economic, and sovereign control.
 
 ---
 
@@ -109,7 +114,7 @@ No existing tool makes this routing decision explicit, auditable, and configurab
 
 ---
 
-## 3. The Three AEOS Product Paths
+## 3. The Four AEOS Product Paths
 
 ---
 
@@ -212,6 +217,63 @@ aeos review --local                              # local code review
 ```
 
 **Outcome:** A team that can iterate on their product continuously, at near-zero token cost, with frontier AI reserved for the tasks that genuinely require it — and with full transparency about when frontier is used.
+
+---
+
+### Path D — Modernize and migrate existing applications
+
+> You did not build with AI. You inherited something that was never built to last.
+
+For organizations — enterprises, public institutions, SMEs — that have existing monolithic applications they need to understand, maintain, modernize, or migrate, without being captured by a cloud migration vendor or a consulting firm charging by the day.
+
+**The problem this path addresses:**
+
+Many organizations in Africa and in regulated markets globally are not in the "building fast with AI" problem. They are in a different and older problem: they have a system that runs the business, that nobody fully understands, that costs more every year to maintain, and that every consultant recommends migrating to AWS or Azure — without explaining why, or what that actually changes.
+
+**The monolith trap.** A legacy application is often a monolith: a single codebase with years of undocumented business logic, tightly coupled modules, no tests, no separation of concerns, and a dependency chain that only one or two people understand. Touching one part breaks another. Adding a feature takes months. The original developers are gone.
+
+**The "lift and shift" illusion.** The most common migration recommendation is to move the application to a cloud provider — AWS, Azure, GCP — without changing the architecture. This is called "lift and shift." It solves exactly one problem (hardware maintenance) while making everything else worse: the application is now more expensive (cloud billing replaces owned infrastructure), still monolithic, still undocumented, and now dependent on a foreign cloud vendor that can change pricing or terms at any time. Organizations in Senegal, Côte d'Ivoire, or Morocco that "migrated to the cloud" often find themselves paying three to five times more than before, for the same system, with the same problems, and less control.
+
+**The cost blindspot.** Most organizations with legacy systems do not know the real cost of their application. They know the server cost. They do not know the developer time cost, the maintenance cost, the opportunity cost of features not shipped, or the risk cost of the system going down. Without a clear cost picture, modernization decisions are made on intuition, not on evidence.
+
+**What AEOS provides on Path D:**
+
+AEOS does not promise automatic modernization. It provides structured, static analysis to help teams understand what they have before deciding what to do next.
+
+- **Legacy inspection**: `aeos legacy inspect` scans the project structure, detects languages, frameworks, database connectors, and external dependencies.
+- **Dependency mapping**: `aeos legacy map` generates a visual or structured map of the application's layers — what calls what, what depends on what, what is shared vs. isolated.
+- **Modernization planning**: `aeos modernization plan` generates a progressive roadmap for breaking the monolith into independently deployable modules — without requiring a full rewrite.
+- **Migration readiness**: `aeos migration readiness` assesses whether the application is ready for a container-based or cloud deployment — and what must be done first (add tests, document APIs, isolate database access, add health checks).
+- **Cloud cost readiness**: `aeos cloud-cost check` estimates the structural cost implications of a lift-and-shift migration, and identifies which components should be rearchitected before moving.
+- **FinOps alignment**: `aeos finops check` identifies cost optimization opportunities — unused dependencies, over-provisioned services, missing resource limits, unmetered external API calls.
+
+**The AEOS principle on Path D:**
+
+> Audit first. Understand before you move. Recommend before you automate.
+
+AEOS does not rewrite the application. It does not apply automatic migrations. It does not make architecture decisions autonomously. It gives the team the visibility they need to make those decisions with evidence — and the structure to execute them progressively.
+
+**Future commands on this path:**
+
+```
+aeos legacy inspect                    # inspect legacy project structure
+aeos legacy map                        # generate dependency map
+aeos modernization plan                # step-by-step modernization roadmap
+aeos migration readiness               # assess readiness for container/cloud move
+aeos cloud-cost check                  # estimate structural cost of lift-and-shift
+aeos finops check                      # identify cost optimization opportunities
+```
+
+**The organizations this path serves:**
+
+- A government agency in Senegal running a monolithic Java application built in 2008, maintained by a single vendor, with no documentation and no tests.
+- A bank in Abidjan whose core banking system is a decade-old PHP monolith that runs on physical servers and has never been containerized.
+- An NGO in Nairobi with a donor management system built in Access and VBA, with no exit plan and no one who understands the full data model.
+- A telecoms operator whose internal operations portal is a mix of Perl scripts, Oracle procedures, and undocumented APIs — and whose modernization was "estimated at $2M" by a consulting firm.
+
+None of these organizations need more AI features. They need clarity, structure, and a progressive path forward that they can execute with their own teams.
+
+**Outcome:** An organization that understands what it has, knows what it costs, and has a clear, phased roadmap to modernize — without a big-bang rewrite, without a vendor dependency, and without losing the business logic that makes their system work.
 
 ---
 
@@ -354,6 +416,32 @@ The following strategic themes flow directly from this vision:
 - `aeos score` command
 - Export to JSON for CI dashboards and team reporting
 
+**Legacy Project Inspector (Path D)**
+- Static scan of existing monolithic application structure
+- Language, framework, and database connector detection
+- `aeos legacy inspect` command
+
+**Monolith Dependency Map (Path D)**
+- Structured map of application layers and inter-module dependencies
+- Identification of shared vs. isolated components
+- `aeos legacy map` command
+
+**Modernization Plan Generator (Path D)**
+- Progressive roadmap for decomposing a monolith
+- Phased recommendations: isolate, extract, containerize, decouple
+- `aeos modernization plan` command
+
+**Cloud Cost Readiness Check (Path D)**
+- Structural cost estimation for lift-and-shift migration
+- Identification of components requiring rearchitecture before cloud move
+- `aeos cloud-cost check` command
+
+**FinOps Integration (Path D)**
+- Cost optimization opportunity detection
+- Unused dependencies, over-provisioned services, unmetered external calls
+- `aeos finops check` command
+- Future: integration with Costit for cloud spend visibility
+
 ---
 
 ## 8. What AEOS Is Not
@@ -380,13 +468,14 @@ AEOS assists, audits, and governs. It does not make architectural decisions auto
 
 ## 9. North Star
 
-> AEOS must allow a person or a small team to build, reclaim, and evolve a serious digital product with AI — without losing technical, economic, or sovereign control.
+> AEOS must allow a person, a small team, or an organization to build, reclaim, evolve, and modernize serious digital products with AI — without losing technical, economic, or sovereign control.
 
 This means:
 - A solo founder can build a production-ready SaaS without Supabase, without Vercel, and without paying per-token for every coding task.
 - A freelancer can take over a Lovable project, understand it fully, harden it, and maintain it without depending on the original platform.
 - A small team in Dakar, Lagos, or Nairobi can build and evolve a digital product using local AI models, with frontier AI reserved for the truly complex tasks — at a cost they control.
 - A CTO can enforce sovereignty, security, and quality standards across every project in the organization, through a CLI that runs in CI and on every developer's machine.
+- A government agency or enterprise sitting on a decade-old monolith can understand what it has, know what it costs, and receive a concrete phased roadmap to modernize — without a big-bang rewrite, without vendor capture, and without losing the business logic that runs the organization.
 
 The measure of AEOS success is not the number of users or the amount of code generated.
 
