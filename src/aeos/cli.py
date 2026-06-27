@@ -9,7 +9,7 @@ from aeos.ai import AiRouterError, ask_ai, read_ai_config, run_ai_doctor
 from aeos.generators import GENERATORS
 from aeos.onboarding import check_project
 from aeos.project import inspect_project
-from aeos.providers.supabase import run_supabase_check
+from aeos.providers.supabase import run_rls_inspect, run_supabase_check
 from aeos.reclaim import run_reclaim_inspect
 from aeos.report import generate_report
 from aeos.security import run_security_check as run_sec_check
@@ -22,12 +22,14 @@ ai_app = typer.Typer(help="AI configuration and orchestration commands.")
 sovereignty_app = typer.Typer(help="Sovereignty audit commands.")
 security_app = typer.Typer(help="Security audit commands.")
 supabase_app = typer.Typer(help="Supabase integration audit and remediation.")
+supabase_rls_app = typer.Typer(help="Supabase RLS policy inspection.")
 reclaim_app = typer.Typer(help="Project reclaim and sovereignty analysis.")
 app.add_typer(project_app, name="project")
 app.add_typer(ai_app, name="ai")
 app.add_typer(sovereignty_app, name="sovereignty")
 app.add_typer(security_app, name="security")
 app.add_typer(supabase_app, name="supabase")
+supabase_app.add_typer(supabase_rls_app, name="rls")
 app.add_typer(reclaim_app, name="reclaim")
 
 REQUIRED_TOOLS = ["python", "uv", "git", "docker", "node", "pnpm", "gh", "code"]
@@ -676,6 +678,112 @@ def supabase_check(
 
     typer.echo("")
     if result.status in ("ERROR", "CRITICAL"):
+        raise typer.Exit(code=1)
+
+
+# ---------------------------------------------------------------------------
+# supabase rls inspect
+# ---------------------------------------------------------------------------
+
+
+@supabase_rls_app.command("inspect")
+def supabase_rls_inspect(
+    path: str = typer.Option(".", "--path", "-p", help="Path to project."),
+    json_output: bool = typer.Option(False, "--json", help="JSON output."),
+) -> None:
+    """Inspect Supabase RLS policies from local migration files (read-only)."""
+    project = Path(path).resolve()
+    if not project.is_dir():
+        typer.echo(f"Error: '{path}' does not exist.", err=True)
+        raise typer.Exit(code=1)
+
+    result = run_rls_inspect(project)
+
+    if json_output:
+        payload = {
+            "status": result.status,
+            "migrations_scanned": result.migrations_scanned,
+            "tables": [
+                {
+                    "name": t.name,
+                    "rls_enabled": t.rls_enabled,
+                    "rls_forced": t.rls_forced,
+                    "policy_count": len(t.policies),
+                }
+                for t in result.tables
+            ],
+            "policies": [
+                {
+                    "name": p.name,
+                    "table": p.table,
+                    "command": p.command,
+                    "has_using": bool(p.using_expr),
+                    "has_with_check": bool(p.with_check_expr),
+                    "source_file": p.source_file,
+                    "source_line": p.source_line,
+                }
+                for p in result.policies
+            ],
+            "findings": [
+                {
+                    "severity": f.severity,
+                    "table": f.table,
+                    "rule": f.rule,
+                    "message": f.message,
+                    "recommendation": f.recommendation,
+                    "source_file": f.source_file,
+                }
+                for f in result.findings
+            ],
+            "recommendations": result.recommendations,
+        }
+        typer.echo(json.dumps(payload, indent=2))
+        if result.status == "ERROR":
+            raise typer.Exit(code=1)
+        return
+
+    typer.echo("Supabase RLS Inspect")
+    typer.echo(f"Path:               {result.path}")
+    typer.echo(f"Status:             {result.status}")
+    typer.echo(f"Migrations scanned: {result.migrations_scanned}")
+    typer.echo(f"Tables detected:    {len(result.tables)}")
+    rls_tables = [t for t in result.tables if t.rls_enabled]
+    typer.echo(f"Tables with RLS:    {len(rls_tables)}")
+    typer.echo(f"Policies detected:  {len(result.policies)}")
+
+    if result.tables:
+        typer.echo("")
+        typer.echo("── Tables ──────────────────────────────────────────────")
+        for t in sorted(result.tables, key=lambda x: x.name):
+            rls_tag = "RLS ✓" if t.rls_enabled else "NO RLS ✗"
+            forced_tag = " (forced)" if t.rls_forced else ""
+            typer.echo(
+                f"  {t.name:<30} {rls_tag}{forced_tag}"
+                f"  {len(t.policies)} polic{'y' if len(t.policies) == 1 else 'ies'}"
+            )
+
+    if result.findings:
+        typer.echo("")
+        typer.echo(f"── Findings ({len(result.findings)}) " + "─" * 40)
+        for f in result.findings:
+            typer.echo(f"  [{f.severity:<7}] [{f.rule}] {f.table}")
+            typer.echo(f"    {f.message}")
+            typer.echo(f"    → {f.recommendation}")
+            if f.source_file:
+                typer.echo(f"    @ {f.source_file}")
+            typer.echo("")
+    else:
+        typer.echo("")
+        typer.echo("No RLS findings.")
+
+    typer.echo("── Recommendations ─────────────────────────────────────")
+    for i, rec in enumerate(result.recommendations, start=1):
+        typer.echo(f"  {i}. {rec}")
+
+    typer.echo("")
+    typer.echo("Read-only audit — no files modified, no database connection.")
+
+    if result.status == "ERROR":
         raise typer.Exit(code=1)
 
 
