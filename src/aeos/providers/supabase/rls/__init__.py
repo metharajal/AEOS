@@ -17,6 +17,12 @@ from aeos.providers.supabase.rls.planner import (
     RLSPlanSummary,
     run_rls_plan,
 )
+from aeos.providers.supabase.rls.reviewer import (
+    ReviewBlock,
+    ReviewSummary,
+    RLSReviewResult,
+    run_rls_review,
+)
 
 __all__ = [
     "RLSFinding",
@@ -27,9 +33,13 @@ __all__ = [
     "RLSPlanResult",
     "RLSPlanSummary",
     "RLSPolicy",
+    "RLSReviewResult",
     "RLSTableInfo",
+    "ReviewBlock",
+    "ReviewSummary",
     "SQLBlock",
     "run_rls_generate",
     "run_rls_inspect",
     "run_rls_plan",
+    "run_rls_review",
 ]

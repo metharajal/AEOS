@@ -12,7 +12,12 @@ import pytest
 from typer.testing import CliRunner
 
 from aeos.cli import app
-from aeos.providers.supabase.rls import run_rls_generate, run_rls_inspect, run_rls_plan
+from aeos.providers.supabase.rls import (
+    run_rls_generate,
+    run_rls_inspect,
+    run_rls_plan,
+    run_rls_review,
+)
 
 FIXTURE_DIR = (
     Path(__file__).parent.parent
@@ -493,5 +498,66 @@ class TestRLSGenerateNoMigrations:
         )
         data = json.loads(r.output)
         assert data["summary"]["total_blocks"] == 0
+        assert data["applied"] is False
+        assert data["read_only"] is True
+
+
+# ---------------------------------------------------------------------------
+# TestRLSReviewOnLovableFixture
+# ---------------------------------------------------------------------------
+
+
+class TestRLSReviewOnLovableFixture:
+    def test_returns_result(self) -> None:
+        result = run_rls_review(FIXTURE_DIR)
+        assert result is not None
+
+    def test_applied_false(self) -> None:
+        result = run_rls_review(FIXTURE_DIR)
+        assert result.applied is False
+
+    def test_read_only_true(self) -> None:
+        result = run_rls_review(FIXTURE_DIR)
+        assert result.read_only is True
+
+    def test_verdict_not_blocked(self) -> None:
+        result = run_rls_review(FIXTURE_DIR)
+        assert result.verdict in ("PASS", "WARNING")
+
+    def test_does_not_modify_fixture(self) -> None:
+        before = _fingerprint(FIXTURE_DIR)
+        run_rls_review(FIXTURE_DIR)
+        after = _fingerprint(FIXTURE_DIR)
+        assert before == after
+
+    def test_cli_json_structure(self) -> None:
+        r = runner.invoke(
+            app, ["supabase", "rls", "review", "--path", str(FIXTURE_DIR), "--json"]
+        )
+        data = json.loads(r.output)
+        assert "verdict" in data
+        assert data["applied"] is False
+        assert data["read_only"] is True
+        assert data["summary"]["total_blocks"] >= 0
+
+
+class TestRLSReviewNoMigrations:
+    def test_pass_on_empty(self, tmp_path: Path) -> None:
+        result = run_rls_review(tmp_path)
+        assert result.verdict == "PASS"
+        assert result.applied is False
+
+    def test_cli_exits_zero(self, tmp_path: Path) -> None:
+        r = runner.invoke(app, ["supabase", "rls", "review", "--path", str(tmp_path)])
+        assert r.exit_code == 0
+
+    def test_json_zero_blocks(self, tmp_path: Path) -> None:
+        r = runner.invoke(
+            app,
+            ["supabase", "rls", "review", "--path", str(tmp_path), "--json"],
+        )
+        data = json.loads(r.output)
+        assert data["summary"]["total_blocks"] == 0
+        assert data["verdict"] == "PASS"
         assert data["applied"] is False
         assert data["read_only"] is True

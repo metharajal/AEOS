@@ -13,6 +13,7 @@ from aeos.providers.supabase import (
     run_rls_generate,
     run_rls_inspect,
     run_rls_plan,
+    run_rls_review,
     run_supabase_check,
 )
 from aeos.reclaim import run_reclaim_inspect
@@ -1002,6 +1003,155 @@ def supabase_rls_generate(
     )
 
     if result.status == "ERROR":
+        raise typer.Exit(code=1)
+
+
+# ---------------------------------------------------------------------------
+# supabase rls review
+# ---------------------------------------------------------------------------
+
+
+@supabase_rls_app.command("review")
+def supabase_rls_review(
+    path: str = typer.Option(".", "--path", "-p", help="Path to project."),
+    json_output: bool = typer.Option(False, "--json", help="JSON output."),
+    include_medium: bool = typer.Option(
+        False,
+        "--include-medium",
+        help="Include MEDIUM priority actions.",
+    ),
+) -> None:
+    """Review a proposed RLS migration for safety (read-only)."""
+    project = Path(path).resolve()
+    if not project.is_dir():
+        typer.echo(f"Error: '{path}' does not exist.", err=True)
+        raise typer.Exit(code=1)
+
+    result = run_rls_review(project, include_medium=include_medium)
+
+    if json_output:
+        payload = {
+            "status": result.status,
+            "verdict": result.verdict,
+            "migrations_scanned": result.migrations_scanned,
+            "read_only": result.read_only,
+            "applied": result.applied,
+            "summary": {
+                "total_blocks": result.summary.total_blocks,
+                "safe_executable_blocks": result.summary.safe_executable_blocks,
+                "manual_todo_blocks": result.summary.manual_todo_blocks,
+                "blocked_blocks": result.summary.blocked_blocks,
+                "warnings_count": result.summary.warnings_count,
+                "tables_affected": result.summary.tables_affected,
+                "block_reasons": result.summary.block_reasons,
+            },
+            "safe_blocks": [
+                {
+                    "priority": b.priority,
+                    "table": b.table,
+                    "policy": b.policy,
+                    "risk_type": b.risk_type,
+                    "classification": b.classification,
+                }
+                for b in result.safe_blocks
+            ],
+            "todo_blocks": [
+                {
+                    "priority": b.priority,
+                    "table": b.table,
+                    "policy": b.policy,
+                    "risk_type": b.risk_type,
+                    "classification": b.classification,
+                }
+                for b in result.todo_blocks
+            ],
+            "blocked_blocks": [
+                {
+                    "priority": b.priority,
+                    "table": b.table,
+                    "policy": b.policy,
+                    "risk_type": b.risk_type,
+                    "classification": b.classification,
+                    "reasons": b.reasons,
+                }
+                for b in result.blocked_blocks
+            ],
+            "warnings": result.warnings,
+        }
+        typer.echo(json.dumps(payload, indent=2))
+        if result.verdict == "BLOCKED":
+            raise typer.Exit(code=1)
+        return
+
+    _VERDICT_LABEL = {
+        "PASS": "PASS ✓",
+        "WARNING": "WARNING ⚠",
+        "BLOCKED": "BLOCKED ✗",
+    }
+    label = _VERDICT_LABEL.get(result.verdict, result.verdict)
+
+    typer.echo("Supabase RLS Review Gate")
+    typer.echo(f"Path:               {result.path}")
+    typer.echo(f"Status:             {result.status}")
+    typer.echo(f"Verdict:            {label}")
+    typer.echo(f"Migrations scanned: {result.migrations_scanned}")
+
+    typer.echo("")
+    typer.echo("── Review Summary ───────────────────────────────────────")
+    typer.echo(f"  Safe blocks:      {result.summary.safe_executable_blocks}")
+    typer.echo(f"  Manual TODOs:     {result.summary.manual_todo_blocks}")
+    typer.echo(f"  Blocked blocks:   {result.summary.blocked_blocks}")
+    typer.echo(f"  Warnings:         {result.summary.warnings_count}")
+
+    if result.summary.block_reasons:
+        typer.echo("")
+        typer.echo("── Blocked — Reasons ────────────────────────────────────")
+        for reason in result.summary.block_reasons:
+            typer.echo(f"  ✗ {reason}")
+
+    if result.blocked_blocks:
+        typer.echo("")
+        typer.echo(
+            f"── Blocked Blocks ({result.summary.blocked_blocks})"
+            " ─────────────────────────────"
+        )
+        for b in result.blocked_blocks:
+            typer.echo(f"\n  [{b.priority}] {b.table} — {b.risk_type}")
+            for r in b.reasons:
+                typer.echo(f"    ✗ {r}")
+
+    if result.safe_blocks:
+        typer.echo("")
+        typer.echo(
+            f"── Safe Blocks ({result.summary.safe_executable_blocks})"
+            " ───────────────────────────────"
+        )
+        for b in result.safe_blocks:
+            policy_hint = f" ({b.policy})" if b.policy else ""
+            typer.echo(f"  ✓ [{b.priority}] {b.table} — {b.risk_type}{policy_hint}")
+
+    if result.todo_blocks:
+        typer.echo("")
+        typer.echo(
+            f"── Manual TODOs ({result.summary.manual_todo_blocks})"
+            " ──────────────────────────────"
+        )
+        for b in result.todo_blocks:
+            typer.echo(f"  ? [{b.priority}] {b.table} — {b.risk_type}")
+
+    if result.warnings:
+        typer.echo("")
+        typer.echo("── Warnings ─────────────────────────────────────────────")
+        for w in result.warnings:
+            typer.echo(f"  ! {w}")
+
+    typer.echo("")
+    typer.echo(
+        "Read-only review — no files modified, no migration applied,"
+        " no database connection."
+    )
+
+    if result.verdict == "BLOCKED":
         raise typer.Exit(code=1)
 
 

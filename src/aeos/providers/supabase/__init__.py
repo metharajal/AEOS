@@ -7,6 +7,8 @@ from aeos.providers.supabase.checker import (
     run_supabase_check,
 )
 from aeos.providers.supabase.rls import (
+    ReviewBlock,
+    ReviewSummary,
     RLSFinding,
     RLSGenerateResult,
     RLSGenerateSummary,
@@ -15,11 +17,13 @@ from aeos.providers.supabase.rls import (
     RLSPlanResult,
     RLSPlanSummary,
     RLSPolicy,
+    RLSReviewResult,
     RLSTableInfo,
     SQLBlock,
     run_rls_generate,
     run_rls_inspect,
     run_rls_plan,
+    run_rls_review,
 )
 
 __all__ = [
@@ -31,7 +35,10 @@ __all__ = [
     "RLSPlanResult",
     "RLSPlanSummary",
     "RLSPolicy",
+    "RLSReviewResult",
     "RLSTableInfo",
+    "ReviewBlock",
+    "ReviewSummary",
     "SQLBlock",
     "SupabaseCheckResult",
     "SupabaseKeyRisk",
@@ -41,5 +48,6 @@ __all__ = [
     "run_rls_generate",
     "run_rls_inspect",
     "run_rls_plan",
+    "run_rls_review",
     "run_supabase_check",
 ]
