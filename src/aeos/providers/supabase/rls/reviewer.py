@@ -229,18 +229,8 @@ def _build_summary(
 # ---------------------------------------------------------------------------
 
 
-def run_rls_review(
-    path: Path,
-    include_medium: bool = False,
-) -> RLSReviewResult:
-    """
-    Review the proposed RLS migration for safety and correctness.
-    Read-only — no database connection, no .env read, no file modification.
-    `applied` is always False — no migration is applied.
-    """
-    gen_result = run_rls_generate(path, include_medium=include_medium)
-
-    # Invariant checks on generator output
+def _review_gen_result(gen_result: RLSGenerateResult) -> RLSReviewResult:
+    """Core review logic — operates on an already-computed RLSGenerateResult."""
     invariant_violations = _check_invariants(gen_result)
 
     if not gen_result.blocks:
@@ -268,7 +258,6 @@ def run_rls_review(
             applied=False,
         )
 
-    # Classify each block
     safe_blocks: list[ReviewBlock] = []
     todo_blocks: list[ReviewBlock] = []
     blocked_blocks: list[ReviewBlock] = []
@@ -282,9 +271,7 @@ def run_rls_review(
         else:
             blocked_blocks.append(reviewed)
 
-    # Extra warnings: generator warnings + invariant violations
     all_warnings = list(invariant_violations) + list(gen_result.warnings)
-
     verdict = _determine_verdict(blocked_blocks, todo_blocks, invariant_violations)
     summary = _build_summary(safe_blocks, todo_blocks, blocked_blocks, all_warnings)
 
@@ -301,3 +288,24 @@ def run_rls_review(
         read_only=True,
         applied=False,
     )
+
+
+def run_rls_review_from_result(gen_result: RLSGenerateResult) -> RLSReviewResult:
+    """
+    Review a pre-computed RLSGenerateResult for safety.
+    Read-only — no database connection, no .env read, no file modification.
+    Use this when generate was already called to avoid running it twice.
+    """
+    return _review_gen_result(gen_result)
+
+
+def run_rls_review(
+    path: Path,
+    include_medium: bool = False,
+) -> RLSReviewResult:
+    """
+    Review the proposed RLS migration for safety and correctness.
+    Read-only — no database connection, no .env read, no file modification.
+    `applied` is always False — no migration is applied.
+    """
+    return _review_gen_result(run_rls_generate(path, include_medium=include_medium))

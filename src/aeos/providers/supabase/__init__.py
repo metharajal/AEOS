@@ -24,6 +24,7 @@ from aeos.providers.supabase.rls import (
     run_rls_inspect,
     run_rls_plan,
     run_rls_review,
+    run_rls_review_from_result,
 )
 
 __all__ = [
@@ -49,5 +50,6 @@ __all__ = [
     "run_rls_inspect",
     "run_rls_plan",
     "run_rls_review",
+    "run_rls_review_from_result",
     "run_supabase_check",
 ]

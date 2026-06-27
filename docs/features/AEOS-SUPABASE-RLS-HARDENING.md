@@ -228,9 +228,34 @@ aeos supabase rls review   --path <project> --json
 # Include MEDIUM priority actions (default: CRITICAL + HIGH only)
 aeos supabase rls generate --path <project> --include-medium
 aeos supabase rls review   --path <project> --include-medium
+
+# Export proposed SQL to a file (Sprint 2Y)
+aeos supabase rls generate --path <project> --output <file>
+
+# Export even when TODO blocks remain (WARNING verdict)
+aeos supabase rls generate --path <project> --output <file> --force-warning
+
+# Overwrite an existing output file
+aeos supabase rls generate --path <project> --output <file> --overwrite
 ```
 
 All commands accept `--path .` to target the current directory.
+
+### `--output` export rules
+
+The `--output` flag runs `generate` then `review` automatically and writes the
+file only if the verdict permits:
+
+| Verdict | Without flags | With `--force-warning` |
+|---|---|---|
+| `PASS` | Writes file ✅ | Writes file ✅ |
+| `WARNING` | Refuses ✗ | Writes file ✅ |
+| `BLOCKED` | Refuses ✗ | Refuses ✗ |
+
+If the output file already exists, `--overwrite` is required.
+The written file embeds: AEOS header, date, verdict, `read_only: true`,
+`applied: false`, summary, warnings, TODO list, and the proposed SQL.
+No migration is applied. No database connection is opened.
 
 ---
 
@@ -335,13 +360,13 @@ understanding the business rules around moderation and self-deletion that vary p
 
 ## Proposed Next Steps
 
-### Sprint 2Y — RLS Export
+### Sprint 2Y — RLS Export ✅ (delivered)
 
-`aeos supabase rls export --path <project> --output <file>`
+`aeos supabase rls generate --path <project> --output <file>`
 
-Write the reviewed SQL proposal to a versioned migration file in the client project,
-only after explicit human confirmation. Adds a timestamp and AEOS metadata header.
-Still does not apply anything.
+Implemented as an option on the existing `generate` command (not a separate command).
+Runs generate → review → writes file conditionally based on verdict.
+Supports `--force-warning` and `--overwrite`. Never applies anything.
 
 ### Sprint 2Z — RLS Test Plan
 

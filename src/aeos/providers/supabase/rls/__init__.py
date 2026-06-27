@@ -22,6 +22,7 @@ from aeos.providers.supabase.rls.reviewer import (
     ReviewSummary,
     RLSReviewResult,
     run_rls_review,
+    run_rls_review_from_result,
 )
 
 __all__ = [
@@ -42,4 +43,5 @@ __all__ = [
     "run_rls_inspect",
     "run_rls_plan",
     "run_rls_review",
+    "run_rls_review_from_result",
 ]
