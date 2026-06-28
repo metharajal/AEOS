@@ -4,6 +4,11 @@ from aeos.providers.supabase.rls.generator import (
     SQLBlock,
     run_rls_generate,
 )
+from aeos.providers.supabase.rls.hardener import (
+    RLSHardenResult,
+    RLSHardenSummary,
+    run_rls_harden,
+)
 from aeos.providers.supabase.rls.inspector import (
     RLSFinding,
     RLSInspectResult,
@@ -29,6 +34,8 @@ __all__ = [
     "RLSFinding",
     "RLSGenerateResult",
     "RLSGenerateSummary",
+    "RLSHardenResult",
+    "RLSHardenSummary",
     "RLSInspectResult",
     "RLSPlanAction",
     "RLSPlanResult",
@@ -40,6 +47,7 @@ __all__ = [
     "ReviewSummary",
     "SQLBlock",
     "run_rls_generate",
+    "run_rls_harden",
     "run_rls_inspect",
     "run_rls_plan",
     "run_rls_review",

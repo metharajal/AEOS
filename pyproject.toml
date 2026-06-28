@@ -103,6 +103,11 @@ warn_return_any = true
 warn_unused_configs = true
 exclude = ["^tests/", "^docs/"]
 
+[[tool.mypy.overrides]]
+# Typer decorators (@app.command) are untyped by design — not a real type error.
+module = ["aeos.cli"]
+disable_error_code = ["untyped-decorator"]
+
 # ==============================================================================
 # Pytest
 # ==============================================================================
