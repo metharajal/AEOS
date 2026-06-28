@@ -5,6 +5,7 @@ Unit tests for aeos supabase rls generate --output (Sprint 2Y).
 from __future__ import annotations
 
 import datetime
+import re
 from pathlib import Path
 from unittest.mock import patch
 
@@ -44,6 +45,10 @@ _SECRET_PATTERNS = [
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _strip_ansi(text: str) -> str:
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
 
 
 def _gen_result(
@@ -224,9 +229,10 @@ class TestCLIGenerateWithoutOutput:
 
     def test_help_shows_output_option(self) -> None:
         result = runner.invoke(app, ["supabase", "rls", "generate", "--help"])
-        assert "--output" in result.output
-        assert "--force-warning" in result.output
-        assert "--overwrite" in result.output
+        plain = _strip_ansi(result.output)
+        assert "--output" in plain
+        assert "--force-warning" in plain
+        assert "--overwrite" in plain
 
 
 # ---------------------------------------------------------------------------
