@@ -1,0 +1,1008 @@
+"""
+Unit tests for aeos.reclaim.hardener and the `reclaim harden` CLI command.
+No network access. No real git repos. No secret values read.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+from typer.testing import CliRunner
+
+from aeos.cli import app
+from aeos.reclaim.hardener import (
+    ReclaimHardenResult,
+    ReclaimHardenSummary,
+    _build_exit_options,
+    _build_recommendations,
+    _compute_status,
+    _control_level,
+    _count_findings,
+    run_reclaim_harden,
+)
+from aeos.reclaim.inspector import (
+    ReclaimControlMap,
+    ReclaimExitOption,
+    ReclaimGenerator,
+    ReclaimInspectResult,
+    ReclaimProvider,
+)
+from aeos.security.checker import SecurityCheckResult, SecurityFinding
+from aeos.sovereignty.checker import SovereigntyCheckResult, SovereigntyFinding
+
+runner = CliRunner()
+
+# ---------------------------------------------------------------------------
+# Fixtures / builders
+# ---------------------------------------------------------------------------
+
+
+def _make_control_map(
+    portability: str = "partial",
+    secrets_exposure: str = "none",
+    backend_runtime: str = "likely_external",
+) -> ReclaimControlMap:
+    return ReclaimControlMap(
+        frontend_code="partial",
+        backend_runtime=backend_runtime,
+        database_schema="partial",
+        auth="likely_external",
+        storage="likely_external",
+        secrets_control="local",
+        secrets_exposure=secrets_exposure,
+        deployment="likely_external",
+        portability=portability,
+    )
+
+
+def _make_exit_options() -> list[ReclaimExitOption]:
+    return [
+        ReclaimExitOption(
+            id="secure_in_place",
+            label="Stay on current provider but secure",
+            complexity="low",
+            sovereignty="partial",
+            advantages=["no migration required"],
+            risks=["vendor lock-in"],
+            next_action="Run aeos supabase check",
+        ),
+        ReclaimExitOption(
+            id="own_supabase_cloud",
+            label="Migrate to own Supabase Cloud project",
+            complexity="medium",
+            sovereignty="medium",
+            advantages=["you own the project"],
+            risks=["still cloud-dependent"],
+            next_action="Export schema",
+        ),
+    ]
+
+
+def _make_reclaim(
+    status: str = "WARNING",
+    secrets_exposure: str = "none",
+    portability: str = "partial",
+    generator: str | None = "lovable",
+    supabase_detected: bool = True,
+) -> ReclaimInspectResult:
+    generators = [
+        ReclaimGenerator(
+            name="lovable",
+            detected=(generator == "lovable"),
+            evidence=".lovable/:1" if generator == "lovable" else "",
+        ),
+        ReclaimGenerator(name="bolt", detected=False, evidence=""),
+        ReclaimGenerator(name="replit", detected=False, evidence=""),
+    ]
+    providers = [
+        ReclaimProvider(
+            name="supabase",
+            detected=supabase_detected,
+            roles=["database", "auth"],
+            evidence="supabase/migrations/:1",
+        ),
+        ReclaimProvider(name="vercel", detected=False, roles=[], evidence=""),
+    ]
+    cm = _make_control_map(
+        portability=portability,
+        secrets_exposure=secrets_exposure,
+    )
+    return ReclaimInspectResult(
+        path=Path("/fake/project"),
+        status=status,
+        generators=generators,
+        providers=providers,
+        control_map=cm,
+        exit_options=_make_exit_options(),
+        recommended_next_action="Run aeos supabase check",
+    )
+
+
+def _make_security(status: str = "WARNING", error: bool = False) -> SecurityCheckResult:
+    findings = []
+    if error:
+        findings.append(
+            SecurityFinding(
+                category="secrets",
+                severity="ERROR",
+                message="Critical secret exposed",
+                location=".env:1",
+                recommendation="Rotate immediately",
+                evidence="file:1",
+            )
+        )
+    elif status == "WARNING":
+        findings.append(
+            SecurityFinding(
+                category="secrets",
+                severity="WARNING",
+                message="Sensitive key name found in tracked file",
+                location=".env.example:1",
+                recommendation="Use .env.example without values",
+                evidence="file:1",
+            )
+        )
+    return SecurityCheckResult(
+        path=Path("/fake/project"),
+        status=status,
+        findings=findings,
+    )
+
+
+def _make_sovereignty(status: str = "WARNING") -> SovereigntyCheckResult:
+    findings = []
+    if status == "WARNING":
+        findings.append(
+            SovereigntyFinding(
+                category="portability",
+                severity="WARNING",
+                message="No Dockerfile found",
+                location="project root",
+                recommendation="Add Dockerfile",
+                evidence="",
+            )
+        )
+    return SovereigntyCheckResult(
+        path=Path("/fake/project"),
+        status=status,
+        findings=findings,
+    )
+
+
+def _make_rls_mock(verdict: str = "WARNING") -> MagicMock:
+    rls = MagicMock()
+    rls.status = "WARNING" if verdict == "WARNING" else "OK"
+    rls.migrations_scanned = 8
+    rls.review.verdict = verdict
+    rls.summary.auto_blocks = 25
+    rls.summary.todo_blocks = 13
+    rls.summary.blocked_blocks = 0
+    rls.inspect.findings = []
+    return rls
+
+
+def _make_supabase_mock(status: str = "WARNING") -> MagicMock:
+    sup = MagicMock()
+    sup.status = status
+    sup.supabase_detected = True
+    sup.requires_manual_action = True
+    step = MagicMock()
+    step.status = "manual"
+    step.action = "Rotate SUPABASE_SERVICE_ROLE_KEY"
+    sup.remediation_steps = [step]
+    return sup
+
+
+def _make_harden_result(
+    status: str = "WARNING",
+    secrets_exposure: str = "none",
+    rls_verdict: str = "WARNING",
+    security_error: bool = False,
+    supabase_status: str = "WARNING",
+) -> ReclaimHardenResult:
+    reclaim = _make_reclaim(secrets_exposure=secrets_exposure)
+    security = _make_security(error=security_error)
+    sovereignty = _make_sovereignty()
+    supabase = _make_supabase_mock(supabase_status)
+    rls = _make_rls_mock(rls_verdict)
+    summary = ReclaimHardenSummary(
+        generator_detected="lovable",
+        providers_detected=["supabase"],
+        control_level="partial",
+        secrets_exposure=secrets_exposure,
+        security_status=security.status,
+        sovereignty_status=sovereignty.status,
+        supabase_status=supabase_status,
+        rls_verdict=rls_verdict,
+        generated_actions=25,
+        manual_actions=13,
+        critical_findings=1 if security_error else 0,
+        important_findings=2,
+    )
+    return ReclaimHardenResult(
+        path=Path("/fake/project"),
+        status=status,
+        summary=summary,
+        reclaim=reclaim,
+        security=security,
+        sovereignty=sovereignty,
+        supabase=supabase,
+        rls=rls,
+        recommendations=["Review 13 RLS TODO blocks."],
+        exit_options=["1. [low/partial] Stay on current provider"],
+        read_only=True,
+        applied=False,
+    )
+
+
+# ---------------------------------------------------------------------------
+# TestDataModel
+# ---------------------------------------------------------------------------
+
+
+class TestDataModel:
+    def test_summary_fields(self) -> None:
+        s = ReclaimHardenSummary(
+            generator_detected="lovable",
+            providers_detected=["supabase"],
+            control_level="partial",
+            secrets_exposure="none",
+            security_status="WARNING",
+            sovereignty_status="WARNING",
+            supabase_status="WARNING",
+            rls_verdict="WARNING",
+            generated_actions=25,
+            manual_actions=13,
+            critical_findings=0,
+            important_findings=2,
+        )
+        assert s.generator_detected == "lovable"
+        assert s.generated_actions == 25
+
+    def test_result_read_only_applied(self, tmp_path: Path) -> None:
+        result = _make_harden_result()
+        assert result.read_only is True
+        assert result.applied is False
+
+    def test_result_defaults(self) -> None:
+        result = _make_harden_result()
+        assert result.path == Path("/fake/project")
+        assert result.rls is not None
+        assert result.supabase is not None
+
+
+# ---------------------------------------------------------------------------
+# TestControlLevel
+# ---------------------------------------------------------------------------
+
+
+class TestControlLevel:
+    def test_strong_portability(self) -> None:
+        r = _make_reclaim(portability="strong")
+        assert _control_level(r) == "controlled"
+
+    def test_partial_portability(self) -> None:
+        r = _make_reclaim(portability="partial")
+        assert _control_level(r) == "partial"
+
+    def test_weak_portability(self) -> None:
+        r = _make_reclaim(portability="weak")
+        assert _control_level(r) == "weak"
+
+
+# ---------------------------------------------------------------------------
+# TestCountFindings
+# ---------------------------------------------------------------------------
+
+
+class TestCountFindings:
+    def test_counts_security_error(self) -> None:
+        security = _make_security(error=True)
+        sovereignty = _make_sovereignty(status="OK")
+        crit, important = _count_findings(security, sovereignty, None)
+        assert crit == 1
+        assert important == 0
+
+    def test_counts_sovereignty_warning(self) -> None:
+        security = _make_security(status="OK")
+        sovereignty = _make_sovereignty(status="WARNING")
+        crit, important = _count_findings(security, sovereignty, None)
+        assert crit == 0
+        assert important == 1
+
+    def test_counts_rls_findings(self) -> None:
+        from aeos.providers.supabase.rls.inspector import RLSFinding
+
+        security = _make_security(status="OK")
+        sovereignty = _make_sovereignty(status="OK")
+        rls = _make_rls_mock()
+        rls_finding = MagicMock(spec=RLSFinding)
+        rls_finding.severity = "ERROR"
+        rls_finding.table = "budget_entries"
+        rls_finding.policy_name = "budget_entries_select"
+        rls_finding.issue = "SELECT_TOO_PERMISSIVE"
+        rls.inspect.findings = [rls_finding]
+        crit, _important = _count_findings(security, sovereignty, rls)
+        assert crit == 1
+
+    def test_no_findings_zero(self) -> None:
+        security = _make_security(status="OK")
+        sovereignty = _make_sovereignty(status="OK")
+        crit, important = _count_findings(security, sovereignty, None)
+        assert crit == 0
+        assert important == 0
+
+
+# ---------------------------------------------------------------------------
+# TestComputeStatus
+# ---------------------------------------------------------------------------
+
+
+class TestComputeStatus:
+    def test_error_on_confirmed_secrets(self) -> None:
+        reclaim = _make_reclaim(secrets_exposure="confirmed")
+        security = _make_security(status="OK")
+        assert _compute_status(reclaim, security, None, None) == "ERROR"
+
+    def test_error_on_risk_secrets(self) -> None:
+        reclaim = _make_reclaim(secrets_exposure="risk")
+        security = _make_security(status="OK")
+        assert _compute_status(reclaim, security, None, None) == "ERROR"
+
+    def test_error_on_security_error_finding(self) -> None:
+        reclaim = _make_reclaim(secrets_exposure="none", generator=None)
+        security = _make_security(error=True)
+        assert _compute_status(reclaim, security, None, None) == "ERROR"
+
+    def test_error_on_supabase_critical(self) -> None:
+        reclaim = _make_reclaim(
+            secrets_exposure="none", generator=None, portability="strong"
+        )
+        security = _make_security(status="OK")
+        supabase = _make_supabase_mock(status="CRITICAL")
+        assert _compute_status(reclaim, security, supabase, None) == "ERROR"
+
+    def test_error_on_supabase_error(self) -> None:
+        reclaim = _make_reclaim(
+            secrets_exposure="none", generator=None, portability="strong"
+        )
+        security = _make_security(status="OK")
+        supabase = _make_supabase_mock(status="ERROR")
+        assert _compute_status(reclaim, security, supabase, None) == "ERROR"
+
+    def test_error_on_rls_blocked(self) -> None:
+        reclaim = _make_reclaim(
+            secrets_exposure="none", generator=None, portability="strong"
+        )
+        security = _make_security(status="OK")
+        rls = _make_rls_mock(verdict="BLOCKED")
+        assert _compute_status(reclaim, security, None, rls) == "ERROR"
+
+    def test_warning_on_generator_detected(self) -> None:
+        reclaim = _make_reclaim(secrets_exposure="none", generator="lovable")
+        security = _make_security(status="OK")
+        assert _compute_status(reclaim, security, None, None) == "WARNING"
+
+    def test_warning_on_weak_portability(self) -> None:
+        reclaim = _make_reclaim(
+            secrets_exposure="none", generator=None, portability="weak"
+        )
+        security = _make_security(status="OK")
+        assert _compute_status(reclaim, security, None, None) == "WARNING"
+
+    def test_warning_on_partial_portability(self) -> None:
+        reclaim = _make_reclaim(
+            secrets_exposure="none", generator=None, portability="partial"
+        )
+        security = _make_security(status="OK")
+        assert _compute_status(reclaim, security, None, None) == "WARNING"
+
+    def test_warning_on_security_warning(self) -> None:
+        reclaim = _make_reclaim(
+            secrets_exposure="none", generator=None, portability="strong"
+        )
+        security = _make_security(status="WARNING")
+        assert _compute_status(reclaim, security, None, None) == "WARNING"
+
+    def test_warning_on_rls_warning(self) -> None:
+        reclaim = _make_reclaim(
+            secrets_exposure="none", generator=None, portability="strong"
+        )
+        security = _make_security(status="OK")
+        rls = _make_rls_mock(verdict="WARNING")
+        assert _compute_status(reclaim, security, None, rls) == "WARNING"
+
+    def test_ok_on_clean_project(self) -> None:
+        reclaim = _make_reclaim(
+            secrets_exposure="none",
+            generator=None,
+            portability="strong",
+            supabase_detected=False,
+        )
+        security = _make_security(status="OK")
+        assert _compute_status(reclaim, security, None, None) == "OK"
+
+
+# ---------------------------------------------------------------------------
+# TestBuildRecommendations
+# ---------------------------------------------------------------------------
+
+
+class TestBuildRecommendations:
+    def test_recommends_rotate_on_confirmed_secrets(self) -> None:
+        reclaim = _make_reclaim(secrets_exposure="confirmed")
+        security = _make_security(status="OK")
+        recs = _build_recommendations(reclaim, security, None, None, Path("/fake"))
+        assert any("Rotate" in r for r in recs)
+
+    def test_recommends_remove_env_on_risk(self) -> None:
+        reclaim = _make_reclaim(secrets_exposure="risk")
+        security = _make_security(status="OK")
+        recs = _build_recommendations(reclaim, security, None, None, Path("/fake"))
+        assert any("Remove .env" in r for r in recs)
+
+    def test_recommends_export_on_auto_blocks(self) -> None:
+        reclaim = _make_reclaim()
+        security = _make_security(status="OK")
+        rls = _make_rls_mock(verdict="WARNING")
+        recs = _build_recommendations(reclaim, security, None, rls, Path("/fake"))
+        assert any("aeos supabase rls harden" in r for r in recs)
+
+    def test_fallback_on_clean_project(self) -> None:
+        reclaim = _make_reclaim(
+            secrets_exposure="none", generator=None, portability="strong"
+        )
+        security = _make_security(status="OK")
+        recs = _build_recommendations(reclaim, security, None, None, Path("/fake"))
+        assert len(recs) >= 1
+
+    def test_manual_steps_included(self) -> None:
+        reclaim = _make_reclaim()
+        security = _make_security(status="OK")
+        supabase = _make_supabase_mock()
+        recs = _build_recommendations(reclaim, security, supabase, None, Path("/fake"))
+        assert any("manual Supabase" in r for r in recs)
+
+
+# ---------------------------------------------------------------------------
+# TestBuildExitOptions
+# ---------------------------------------------------------------------------
+
+
+class TestBuildExitOptions:
+    def test_exit_options_count(self) -> None:
+        reclaim = _make_reclaim()
+        opts = _build_exit_options(reclaim)
+        assert len(opts) == len(reclaim.exit_options)
+
+    def test_exit_options_format(self) -> None:
+        reclaim = _make_reclaim()
+        opts = _build_exit_options(reclaim)
+        for opt in opts:
+            assert "/" in opt
+            assert opt.startswith(tuple("12345"))
+
+
+# ---------------------------------------------------------------------------
+# TestRunReclaimHarden (integration-style with mocks)
+# ---------------------------------------------------------------------------
+
+
+class TestRunReclaimHarden:
+    def _patch_all(
+        self,
+        reclaim: object,
+        security: object,
+        sovereignty: object,
+        supabase: object | None = None,
+        rls: object | None = None,
+        has_migrations: bool = True,
+    ) -> list[object]:
+        return [
+            patch("aeos.reclaim.hardener.run_reclaim_inspect", return_value=reclaim),
+            patch("aeos.reclaim.hardener.run_security_check", return_value=security),
+            patch(
+                "aeos.reclaim.hardener.run_sovereignty_check",
+                return_value=sovereignty,
+            ),
+            patch(
+                "aeos.reclaim.hardener.run_supabase_check",
+                return_value=supabase or _make_supabase_mock(),
+            ),
+            patch(
+                "aeos.reclaim.hardener.run_rls_harden",
+                return_value=rls or _make_rls_mock(),
+            ),
+            patch(
+                "aeos.reclaim.hardener.Path.is_dir",
+                return_value=has_migrations,
+            ),
+        ]
+
+    def test_result_read_only_true(self, tmp_path: Path) -> None:
+        reclaim = _make_reclaim(supabase_detected=False)
+        security = _make_security(status="OK")
+        sovereignty = _make_sovereignty(status="OK")
+        _patch = "aeos.reclaim.hardener"
+        with (
+            patch(f"{_patch}.run_reclaim_inspect", return_value=reclaim),
+            patch(f"{_patch}.run_security_check", return_value=security),
+            patch(f"{_patch}.run_sovereignty_check", return_value=sovereignty),
+        ):
+            result = run_reclaim_harden(tmp_path)
+        assert result.read_only is True
+
+    def test_result_applied_false(self, tmp_path: Path) -> None:
+        reclaim = _make_reclaim(supabase_detected=False)
+        security = _make_security(status="OK")
+        sovereignty = _make_sovereignty(status="OK")
+        _patch = "aeos.reclaim.hardener"
+        with (
+            patch(f"{_patch}.run_reclaim_inspect", return_value=reclaim),
+            patch(f"{_patch}.run_security_check", return_value=security),
+            patch(f"{_patch}.run_sovereignty_check", return_value=sovereignty),
+        ):
+            result = run_reclaim_harden(tmp_path)
+        assert result.applied is False
+
+    def test_no_supabase_skips_rls(self, tmp_path: Path) -> None:
+        reclaim = _make_reclaim(supabase_detected=False)
+        security = _make_security(status="OK")
+        sovereignty = _make_sovereignty(status="OK")
+        _patch = "aeos.reclaim.hardener"
+        with (
+            patch(f"{_patch}.run_reclaim_inspect", return_value=reclaim),
+            patch(f"{_patch}.run_security_check", return_value=security),
+            patch(f"{_patch}.run_sovereignty_check", return_value=sovereignty),
+            patch(f"{_patch}.run_rls_harden") as mock_rls,
+        ):
+            result = run_reclaim_harden(tmp_path)
+        mock_rls.assert_not_called()
+        assert result.rls is None
+        assert result.supabase is None
+
+    def test_supabase_detected_runs_supabase_check(self, tmp_path: Path) -> None:
+        reclaim = _make_reclaim(supabase_detected=True)
+        security = _make_security(status="OK")
+        sovereignty = _make_sovereignty(status="OK")
+        supabase_mock = _make_supabase_mock()
+        migrations_dir = tmp_path / "supabase" / "migrations"
+        migrations_dir.mkdir(parents=True)
+        _p = "aeos.reclaim.hardener"
+        with (
+            patch(f"{_p}.run_reclaim_inspect", return_value=reclaim),
+            patch(f"{_p}.run_security_check", return_value=security),
+            patch(f"{_p}.run_sovereignty_check", return_value=sovereignty),
+            patch(f"{_p}.run_supabase_check", return_value=supabase_mock) as mock_sup,
+            patch(f"{_p}.run_rls_harden", return_value=_make_rls_mock()),
+        ):
+            run_reclaim_harden(tmp_path)
+        mock_sup.assert_called_once()
+
+    def test_rls_not_run_without_migrations(self, tmp_path: Path) -> None:
+        reclaim = _make_reclaim(supabase_detected=True)
+        security = _make_security(status="OK")
+        sovereignty = _make_sovereignty(status="OK")
+        supabase_mock = _make_supabase_mock()
+        _p = "aeos.reclaim.hardener"
+        with (
+            patch(f"{_p}.run_reclaim_inspect", return_value=reclaim),
+            patch(f"{_p}.run_security_check", return_value=security),
+            patch(f"{_p}.run_sovereignty_check", return_value=sovereignty),
+            patch(f"{_p}.run_supabase_check", return_value=supabase_mock),
+            patch(f"{_p}.run_rls_harden") as mock_rls,
+        ):
+            result = run_reclaim_harden(tmp_path)
+        mock_rls.assert_not_called()
+        assert result.rls is None
+
+    def test_status_error_on_confirmed_secrets(self, tmp_path: Path) -> None:
+        reclaim = _make_reclaim(secrets_exposure="confirmed", supabase_detected=False)
+        security = _make_security(status="OK")
+        sovereignty = _make_sovereignty(status="OK")
+        _p = "aeos.reclaim.hardener"
+        with (
+            patch(f"{_p}.run_reclaim_inspect", return_value=reclaim),
+            patch(f"{_p}.run_security_check", return_value=security),
+            patch(f"{_p}.run_sovereignty_check", return_value=sovereignty),
+        ):
+            result = run_reclaim_harden(tmp_path)
+        assert result.status == "ERROR"
+
+    def test_status_warning_on_generator(self, tmp_path: Path) -> None:
+        reclaim = _make_reclaim(generator="lovable", supabase_detected=False)
+        security = _make_security(status="OK")
+        sovereignty = _make_sovereignty(status="OK")
+        _p = "aeos.reclaim.hardener"
+        with (
+            patch(f"{_p}.run_reclaim_inspect", return_value=reclaim),
+            patch(f"{_p}.run_security_check", return_value=security),
+            patch(f"{_p}.run_sovereignty_check", return_value=sovereignty),
+        ):
+            result = run_reclaim_harden(tmp_path)
+        assert result.status == "WARNING"
+
+    def test_status_ok_on_clean_project(self, tmp_path: Path) -> None:
+        reclaim = _make_reclaim(
+            generator=None,
+            portability="strong",
+            secrets_exposure="none",
+            supabase_detected=False,
+        )
+        security = _make_security(status="OK")
+        sovereignty = _make_sovereignty(status="OK")
+        _p = "aeos.reclaim.hardener"
+        with (
+            patch(f"{_p}.run_reclaim_inspect", return_value=reclaim),
+            patch(f"{_p}.run_security_check", return_value=security),
+            patch(f"{_p}.run_sovereignty_check", return_value=sovereignty),
+        ):
+            result = run_reclaim_harden(tmp_path)
+        assert result.status == "OK"
+
+    def test_summary_generator_detected(self, tmp_path: Path) -> None:
+        reclaim = _make_reclaim(generator="lovable", supabase_detected=False)
+        security = _make_security(status="OK")
+        sovereignty = _make_sovereignty(status="OK")
+        _p = "aeos.reclaim.hardener"
+        with (
+            patch(f"{_p}.run_reclaim_inspect", return_value=reclaim),
+            patch(f"{_p}.run_security_check", return_value=security),
+            patch(f"{_p}.run_sovereignty_check", return_value=sovereignty),
+        ):
+            result = run_reclaim_harden(tmp_path)
+        assert result.summary.generator_detected == "lovable"
+
+    def test_summary_no_generator(self, tmp_path: Path) -> None:
+        reclaim = _make_reclaim(generator=None, supabase_detected=False)
+        security = _make_security(status="OK")
+        sovereignty = _make_sovereignty(status="OK")
+        _p = "aeos.reclaim.hardener"
+        with (
+            patch(f"{_p}.run_reclaim_inspect", return_value=reclaim),
+            patch(f"{_p}.run_security_check", return_value=security),
+            patch(f"{_p}.run_sovereignty_check", return_value=sovereignty),
+        ):
+            result = run_reclaim_harden(tmp_path)
+        assert result.summary.generator_detected is None
+
+    def test_summary_generated_actions_from_rls(self, tmp_path: Path) -> None:
+        reclaim = _make_reclaim(supabase_detected=True)
+        security = _make_security(status="OK")
+        sovereignty = _make_sovereignty(status="OK")
+        rls_mock = _make_rls_mock(verdict="WARNING")
+        migrations_dir = tmp_path / "supabase" / "migrations"
+        migrations_dir.mkdir(parents=True)
+        _p = "aeos.reclaim.hardener"
+        with (
+            patch(f"{_p}.run_reclaim_inspect", return_value=reclaim),
+            patch(f"{_p}.run_security_check", return_value=security),
+            patch(f"{_p}.run_sovereignty_check", return_value=sovereignty),
+            patch(f"{_p}.run_supabase_check", return_value=_make_supabase_mock()),
+            patch(f"{_p}.run_rls_harden", return_value=rls_mock),
+        ):
+            result = run_reclaim_harden(tmp_path)
+        assert result.summary.generated_actions == 25
+        assert result.summary.manual_actions >= 13
+
+
+# ---------------------------------------------------------------------------
+# TestCLIReclaimHarden (text output)
+# ---------------------------------------------------------------------------
+
+
+class TestCLIReclaimHarden:
+    def _invoke(self, harden_result: ReclaimHardenResult) -> object:
+        with patch("aeos.cli.run_reclaim_harden", return_value=harden_result):
+            return runner.invoke(app, ["reclaim", "harden", "--path", "/fake/project"])
+
+    def test_title_in_output(self) -> None:
+        result = self._invoke(_make_harden_result())
+        assert "AEOS Reclaim Harden Report" in result.output
+
+    def test_shows_status(self) -> None:
+        result = self._invoke(_make_harden_result(status="WARNING"))
+        assert "WARNING" in result.output
+
+    def test_shows_generator(self) -> None:
+        result = self._invoke(_make_harden_result())
+        assert "lovable" in result.output
+
+    def test_shows_providers(self) -> None:
+        result = self._invoke(_make_harden_result())
+        assert "supabase" in result.output
+
+    def test_shows_rls_verdict(self) -> None:
+        result = self._invoke(_make_harden_result(rls_verdict="WARNING"))
+        assert "WARNING" in result.output
+
+    def test_shows_recommendations(self) -> None:
+        result = self._invoke(_make_harden_result())
+        assert "Recommendations" in result.output
+
+    def test_shows_exit_options(self) -> None:
+        result = self._invoke(_make_harden_result())
+        assert "Exit Options" in result.output
+
+    def test_shows_read_only_footer(self) -> None:
+        result = self._invoke(_make_harden_result())
+        assert "read_only: true" in result.output
+        assert "applied: false" in result.output
+
+    def test_no_secrets_in_output(self) -> None:
+        result = self._invoke(_make_harden_result())
+        secret_patterns = [
+            "eyJ",  # JWT prefix
+            "service_role",
+            "sk-",  # OpenAI key prefix
+            "xoxb-",  # Slack token
+        ]
+        for pattern in secret_patterns:
+            assert pattern not in result.output
+
+    def test_exit_code_1_on_error(self) -> None:
+        result = self._invoke(_make_harden_result(status="ERROR"))
+        assert result.exit_code == 1
+
+    def test_exit_code_0_on_warning(self) -> None:
+        result = self._invoke(_make_harden_result(status="WARNING"))
+        assert result.exit_code == 0
+
+    def test_exit_code_0_on_ok(self) -> None:
+        result = self._invoke(_make_harden_result(status="OK"))
+        assert result.exit_code == 0
+
+    def test_shows_critical_risks_section(self) -> None:
+        result = self._invoke(_make_harden_result(status="ERROR", security_error=True))
+        assert "Critical Risks" in result.output
+
+    def test_shows_generatable_fixes(self) -> None:
+        result = self._invoke(_make_harden_result())
+        assert "Generatable Fixes" in result.output
+        assert "25" in result.output
+
+    def test_shows_manual_actions(self) -> None:
+        result = self._invoke(_make_harden_result())
+        assert "Manual Actions" in result.output
+
+    def test_warning_status_label(self) -> None:
+        result = self._invoke(_make_harden_result(status="WARNING"))
+        assert "WARNING ⚠" in result.output
+
+    def test_ok_status_label(self) -> None:
+        result = self._invoke(_make_harden_result(status="OK"))
+        assert "OK ✓" in result.output
+
+    def test_error_status_label(self) -> None:
+        result = self._invoke(_make_harden_result(status="ERROR"))
+        assert "ERROR ✗" in result.output
+
+
+# ---------------------------------------------------------------------------
+# TestCLIReclaimHardenJSON
+# ---------------------------------------------------------------------------
+
+
+class TestCLIReclaimHardenJSON:
+    def _invoke_json(self, harden_result: ReclaimHardenResult) -> dict[str, object]:
+        with patch("aeos.cli.run_reclaim_harden", return_value=harden_result):
+            r = runner.invoke(
+                app, ["reclaim", "harden", "--path", "/fake/project", "--json"]
+            )
+        return json.loads(r.output)  # type: ignore[no-any-return]
+
+    def test_json_has_status(self) -> None:
+        data = self._invoke_json(_make_harden_result())
+        assert "status" in data
+
+    def test_json_read_only_true(self) -> None:
+        data = self._invoke_json(_make_harden_result())
+        assert data["read_only"] is True
+
+    def test_json_applied_false(self) -> None:
+        data = self._invoke_json(_make_harden_result())
+        assert data["applied"] is False
+
+    def test_json_has_project_path(self) -> None:
+        data = self._invoke_json(_make_harden_result())
+        assert "project_path" in data
+
+    def test_json_has_summary(self) -> None:
+        data = self._invoke_json(_make_harden_result())
+        assert "summary" in data
+        s = data["summary"]
+        assert "generator_detected" in s
+        assert "providers_detected" in s
+        assert "control_level" in s
+        assert "secrets_exposure" in s
+        assert "rls_verdict" in s
+        assert "generated_actions" in s
+        assert "manual_actions" in s
+
+    def test_json_has_reclaim_section(self) -> None:
+        data = self._invoke_json(_make_harden_result())
+        assert "reclaim" in data
+
+    def test_json_has_security_section(self) -> None:
+        data = self._invoke_json(_make_harden_result())
+        assert "security" in data
+
+    def test_json_has_sovereignty_section(self) -> None:
+        data = self._invoke_json(_make_harden_result())
+        assert "sovereignty" in data
+
+    def test_json_has_supabase_section(self) -> None:
+        data = self._invoke_json(_make_harden_result())
+        assert "supabase" in data
+        assert data["supabase"] is not None
+
+    def test_json_has_rls_section(self) -> None:
+        data = self._invoke_json(_make_harden_result())
+        assert "rls" in data
+        assert data["rls"] is not None
+
+    def test_json_rls_has_verdict(self) -> None:
+        data = self._invoke_json(_make_harden_result(rls_verdict="WARNING"))
+        assert data["rls"]["verdict"] == "WARNING"
+
+    def test_json_has_recommendations(self) -> None:
+        data = self._invoke_json(_make_harden_result())
+        assert isinstance(data["recommendations"], list)
+
+    def test_json_has_exit_options(self) -> None:
+        data = self._invoke_json(_make_harden_result())
+        assert isinstance(data["exit_options"], list)
+
+    def test_json_no_rls_when_none(self) -> None:
+        result = _make_harden_result()
+        result.rls = None
+        result.summary.rls_verdict = None
+        result.summary.generated_actions = 0
+        data = self._invoke_json(result)
+        assert data["rls"] is None
+
+    def test_json_no_supabase_when_none(self) -> None:
+        result = _make_harden_result()
+        result.supabase = None
+        result.summary.supabase_status = None
+        data = self._invoke_json(result)
+        assert data["supabase"] is None
+
+    def test_json_valid_structure_on_error(self) -> None:
+        result = _make_harden_result(status="ERROR")
+        with patch("aeos.cli.run_reclaim_harden", return_value=result):
+            r = runner.invoke(
+                app, ["reclaim", "harden", "--path", "/fake/project", "--json"]
+            )
+        data = json.loads(r.output)
+        assert data["status"] == "ERROR"
+        assert r.exit_code == 1
+
+    def test_json_no_secret_values(self) -> None:
+        data = self._invoke_json(_make_harden_result())
+        output = json.dumps(data)
+        for pattern in ["eyJ", "sk-", "service_role_key_value", "xoxb-"]:
+            assert pattern not in output
+
+
+# ---------------------------------------------------------------------------
+# TestCLIHardenHelp
+# ---------------------------------------------------------------------------
+
+
+class TestCLIHardenHelp:
+    def test_help_shows_command(self) -> None:
+        import re
+
+        result = runner.invoke(app, ["reclaim", "harden", "--help"])
+        plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+        assert "--path" in plain
+        assert "--json" in plain
+
+
+# ---------------------------------------------------------------------------
+# TestFixture — lightweight Lovable/Supabase project
+# ---------------------------------------------------------------------------
+
+
+class TestFixture:
+    """Test run_reclaim_harden on a minimal synthetic fixture."""
+
+    @pytest.fixture()
+    def lovable_supabase_project(self, tmp_path: Path) -> Path:
+        (tmp_path / ".lovable").mkdir()
+        (tmp_path / "src").mkdir()
+        (tmp_path / "supabase" / "migrations").mkdir(parents=True)
+        (tmp_path / "supabase" / "config.toml").write_text(
+            "[api]\nenabled = true\n", encoding="utf-8"
+        )
+        (tmp_path / "package.json").write_text(
+            '{"dependencies": {"@supabase/supabase-js": "^2.0.0"}}',
+            encoding="utf-8",
+        )
+        (tmp_path / ".gitignore").write_text(".env\n.env.*\n", encoding="utf-8")
+        migration = tmp_path / "supabase" / "migrations" / "20240101_init.sql"
+        migration.write_text(
+            "CREATE TABLE citizens (id uuid PRIMARY KEY);\n"
+            "ALTER TABLE citizens ENABLE ROW LEVEL SECURITY;\n",
+            encoding="utf-8",
+        )
+        return tmp_path
+
+    @pytest.fixture()
+    def clean_project(self, tmp_path: Path) -> Path:
+        (tmp_path / "src").mkdir()
+        (tmp_path / "server").mkdir()
+        (tmp_path / "prisma").mkdir()
+        (tmp_path / "Dockerfile").write_text("FROM python:3.12\n", encoding="utf-8")
+        (tmp_path / ".gitignore").write_text(".env\n", encoding="utf-8")
+        return tmp_path
+
+    def test_lovable_supabase_fixture_warning_or_error(
+        self, lovable_supabase_project: Path
+    ) -> None:
+        result = run_reclaim_harden(lovable_supabase_project)
+        assert result.status in ("WARNING", "ERROR")
+        assert result.read_only is True
+        assert result.applied is False
+
+    def test_lovable_supabase_fixture_detects_generator(
+        self, lovable_supabase_project: Path
+    ) -> None:
+        result = run_reclaim_harden(lovable_supabase_project)
+        assert result.summary.generator_detected == "lovable"
+
+    def test_lovable_supabase_fixture_detects_supabase(
+        self, lovable_supabase_project: Path
+    ) -> None:
+        result = run_reclaim_harden(lovable_supabase_project)
+        assert "supabase" in result.summary.providers_detected
+
+    def test_lovable_supabase_fixture_runs_rls(
+        self, lovable_supabase_project: Path
+    ) -> None:
+        result = run_reclaim_harden(lovable_supabase_project)
+        assert result.rls is not None
+
+    def test_lovable_supabase_fixture_no_client_files_modified(
+        self, lovable_supabase_project: Path
+    ) -> None:
+        import os
+
+        files_before = {
+            p: os.path.getmtime(p)
+            for p in lovable_supabase_project.rglob("*")
+            if p.is_file()
+        }
+        run_reclaim_harden(lovable_supabase_project)
+        for p, mtime in files_before.items():
+            assert os.path.getmtime(p) == mtime, f"File modified: {p}"
+
+    def test_clean_project_ok_or_warning(self, clean_project: Path) -> None:
+        result = run_reclaim_harden(clean_project)
+        assert result.status in ("OK", "WARNING")
+        assert result.read_only is True
+        assert result.applied is False
+
+    def test_fixture_json_cli_valid(self, lovable_supabase_project: Path) -> None:
+        with patch(
+            "aeos.cli.run_reclaim_harden",
+            side_effect=lambda p: run_reclaim_harden(p),
+        ):
+            r = runner.invoke(
+                app,
+                [
+                    "reclaim",
+                    "harden",
+                    "--path",
+                    str(lovable_supabase_project),
+                    "--json",
+                ],
+            )
+        data = json.loads(r.output)
+        assert data["read_only"] is True
+        assert data["applied"] is False
+        assert "summary" in data
