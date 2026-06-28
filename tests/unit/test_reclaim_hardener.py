@@ -21,6 +21,7 @@ from aeos.reclaim.hardener import (
     _compute_status,
     _control_level,
     _count_findings,
+    build_harden_report,
     run_reclaim_harden,
 )
 from aeos.reclaim.inspector import (
@@ -901,6 +902,408 @@ class TestCLIHardenHelp:
         plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
         assert "--path" in plain
         assert "--json" in plain
+        assert "--output" in plain
+        assert "--overwrite" in plain
+
+
+# ---------------------------------------------------------------------------
+# TestBuildHardenReport
+# ---------------------------------------------------------------------------
+
+
+class TestBuildHardenReport:
+    def test_contains_aeos_header(self) -> None:
+        report = build_harden_report(_make_harden_result())
+        assert "AEOS Reclaim Harden Report" in report
+
+    def test_contains_read_only_true(self) -> None:
+        report = build_harden_report(_make_harden_result())
+        assert "read_only:     true" in report
+
+    def test_contains_applied_false(self) -> None:
+        report = build_harden_report(_make_harden_result())
+        assert "applied:       false" in report
+
+    def test_contains_global_status(self) -> None:
+        report = build_harden_report(_make_harden_result(status="WARNING"))
+        assert "WARNING" in report
+
+    def test_contains_generator(self) -> None:
+        report = build_harden_report(_make_harden_result())
+        assert "lovable" in report
+
+    def test_contains_providers(self) -> None:
+        report = build_harden_report(_make_harden_result())
+        assert "supabase" in report
+
+    def test_contains_exit_options(self) -> None:
+        report = build_harden_report(_make_harden_result())
+        assert "Exit Options" in report
+        assert "Stay on current provider" in report
+
+    def test_contains_recommendations(self) -> None:
+        report = build_harden_report(_make_harden_result())
+        assert "Recommendations" in report
+
+    def test_contains_no_correction_applied_notice(self) -> None:
+        report = build_harden_report(_make_harden_result())
+        assert "No correction has been applied" in report
+
+    def test_no_secrets_in_report(self) -> None:
+        report = build_harden_report(_make_harden_result())
+        for pattern in ["eyJ", "service_role_key_value", "sk-", "xoxb-"]:
+            assert pattern not in report
+
+    def test_date_present(self) -> None:
+        import datetime
+
+        today = datetime.date.today().isoformat()
+        report = build_harden_report(_make_harden_result())
+        assert today in report
+
+    def test_error_status_in_report(self) -> None:
+        report = build_harden_report(_make_harden_result(status="ERROR"))
+        assert "ERROR" in report
+
+    def test_ok_status_in_report(self) -> None:
+        report = build_harden_report(_make_harden_result(status="OK"))
+        assert "OK" in report
+
+    def test_critical_risks_section_when_present(self) -> None:
+        report = build_harden_report(_make_harden_result(security_error=True))
+        assert "Critical Risks" in report
+
+    def test_generatable_fixes_section_when_present(self) -> None:
+        report = build_harden_report(_make_harden_result())
+        assert "Generatable Fixes" in report
+        assert "25" in report
+
+    def test_manual_actions_section_when_present(self) -> None:
+        report = build_harden_report(_make_harden_result())
+        assert "Manual Actions Required" in report
+
+    def test_report_ends_with_newline(self) -> None:
+        report = build_harden_report(_make_harden_result())
+        assert report.endswith("\n")
+
+
+# ---------------------------------------------------------------------------
+# TestCLIReclaimHardenOutput
+# ---------------------------------------------------------------------------
+
+
+class TestCLIReclaimHardenOutput:
+    def _invoke_output(
+        self,
+        harden_result: ReclaimHardenResult,
+        out: Path,
+        extra: list[str] | None = None,
+    ) -> object:
+        args = [
+            "reclaim",
+            "harden",
+            "--path",
+            "/fake/project",
+            "--output",
+            str(out),
+            *(extra or []),
+        ]
+        with patch("aeos.cli.run_reclaim_harden", return_value=harden_result):
+            return runner.invoke(app, args)
+
+    def test_no_output_option_writes_no_file(self, tmp_path: Path) -> None:
+        with patch("aeos.cli.run_reclaim_harden", return_value=_make_harden_result()):
+            runner.invoke(app, ["reclaim", "harden", "--path", "/fake/project"])
+        assert not any(tmp_path.iterdir())
+
+    def test_output_writes_file(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        result = self._invoke_output(_make_harden_result(), out)
+        assert result.exit_code == 0, result.output  # type: ignore[union-attr]
+        assert out.exists()
+
+    def test_output_contains_read_only(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        self._invoke_output(_make_harden_result(), out)
+        assert "read_only:     true" in out.read_text()
+
+    def test_output_contains_applied_false(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        self._invoke_output(_make_harden_result(), out)
+        assert "applied:       false" in out.read_text()
+
+    def test_output_contains_status(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        self._invoke_output(_make_harden_result(status="WARNING"), out)
+        assert "WARNING" in out.read_text()
+
+    def test_output_contains_exit_options(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        self._invoke_output(_make_harden_result(), out)
+        assert "Exit Options" in out.read_text()
+
+    def test_output_no_secrets(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        self._invoke_output(_make_harden_result(), out)
+        content = out.read_text()
+        for pattern in ["eyJ", "service_role_key_value", "sk-", "xoxb-"]:
+            assert pattern not in content
+
+    def test_output_no_migration_applied(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        self._invoke_output(_make_harden_result(), out)
+        assert "No correction has been applied" in out.read_text()
+
+    def test_stdout_shows_exported_path(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        result = self._invoke_output(_make_harden_result(), out)
+        assert "Exported:" in result.output  # type: ignore[union-attr]
+
+    def test_stdout_shows_status(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        result = self._invoke_output(_make_harden_result(status="WARNING"), out)
+        assert "WARNING" in result.output  # type: ignore[union-attr]
+
+    def test_stdout_shows_invariants(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        result = self._invoke_output(_make_harden_result(), out)
+        assert "read_only: true" in result.output  # type: ignore[union-attr]
+        assert "applied: false" in result.output  # type: ignore[union-attr]
+
+    def test_existing_file_without_overwrite_refuses(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        out.write_text("old content")
+        result = self._invoke_output(_make_harden_result(), out)
+        assert result.exit_code == 1  # type: ignore[union-attr]
+        assert out.read_text() == "old content"
+
+    def test_existing_file_without_overwrite_shows_hint(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        out.write_text("old content")
+        result = self._invoke_output(_make_harden_result(), out)
+        assert "--overwrite" in result.output  # type: ignore[union-attr]
+
+    def test_existing_file_with_overwrite_succeeds(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        out.write_text("old content")
+        result = self._invoke_output(_make_harden_result(), out, ["--overwrite"])
+        assert result.exit_code == 0  # type: ignore[union-attr]
+        assert out.read_text() != "old content"
+        assert "AEOS Reclaim Harden Report" in out.read_text()
+
+    def test_error_status_exits_1_with_output(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        result = self._invoke_output(_make_harden_result(status="ERROR"), out)
+        assert result.exit_code == 1  # type: ignore[union-attr]
+        assert out.exists()
+
+    def test_env_not_in_output_file(self, tmp_path: Path) -> None:
+        env_file = tmp_path / ".env"
+        env_file.write_text("SUPABASE_URL=https://secret.supabase.co")
+        out = tmp_path / "report.md"
+        self._invoke_output(_make_harden_result(), out)
+        if out.exists():
+            assert "https://secret.supabase.co" not in out.read_text()
+
+
+# ---------------------------------------------------------------------------
+# TestCLIReclaimHardenOutputJSON
+# ---------------------------------------------------------------------------
+
+
+class TestCLIReclaimHardenOutputJSON:
+    def _invoke_json_output(
+        self,
+        harden_result: ReclaimHardenResult,
+        out: Path,
+        extra: list[str] | None = None,
+    ) -> dict[str, object]:
+        args = [
+            "reclaim",
+            "harden",
+            "--path",
+            "/fake/project",
+            "--output",
+            str(out),
+            "--json",
+            *(extra or []),
+        ]
+        with patch("aeos.cli.run_reclaim_harden", return_value=harden_result):
+            r = runner.invoke(app, args)
+        return json.loads(r.output)  # type: ignore[no-any-return]
+
+    def test_json_has_output_written_true(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        data = self._invoke_json_output(_make_harden_result(), out)
+        assert data["output_written"] is True
+
+    def test_json_has_output_path(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        data = self._invoke_json_output(_make_harden_result(), out)
+        assert data["output_path"] == str(out)
+
+    def test_json_no_output_has_output_written_false(self) -> None:
+        with patch("aeos.cli.run_reclaim_harden", return_value=_make_harden_result()):
+            r = runner.invoke(
+                app,
+                ["reclaim", "harden", "--path", "/fake/project", "--json"],
+            )
+        data = json.loads(r.output)
+        assert data["output_written"] is False
+        assert data["output_path"] == ""
+
+    def test_json_read_only_true_with_output(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        data = self._invoke_json_output(_make_harden_result(), out)
+        assert data["read_only"] is True
+
+    def test_json_applied_false_with_output(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        data = self._invoke_json_output(_make_harden_result(), out)
+        assert data["applied"] is False
+
+    def test_json_has_summary_with_output(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        data = self._invoke_json_output(_make_harden_result(), out)
+        assert "summary" in data
+
+    def test_json_no_secrets_with_output(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        data = self._invoke_json_output(_make_harden_result(), out)
+        output_str = json.dumps(data)
+        for pattern in ["eyJ", "service_role_key_value", "sk-", "xoxb-"]:
+            assert pattern not in output_str
+
+
+# ---------------------------------------------------------------------------
+# TestFixtureWithOutput — real fixture, no mocks
+# ---------------------------------------------------------------------------
+
+
+class TestFixtureWithOutput:
+    @pytest.fixture()
+    def lovable_project(self, tmp_path: Path) -> Path:
+        (tmp_path / ".lovable").mkdir()
+        (tmp_path / "src").mkdir()
+        (tmp_path / "supabase" / "migrations").mkdir(parents=True)
+        (tmp_path / "supabase" / "config.toml").write_text(
+            "[api]\nenabled = true\n", encoding="utf-8"
+        )
+        (tmp_path / "package.json").write_text(
+            '{"dependencies": {"@supabase/supabase-js": "^2.0.0"}}',
+            encoding="utf-8",
+        )
+        (tmp_path / ".gitignore").write_text(".env\n.env.*\n", encoding="utf-8")
+        migration = tmp_path / "supabase" / "migrations" / "20240101_init.sql"
+        migration.write_text(
+            "CREATE TABLE citizens (id uuid PRIMARY KEY);\n"
+            "ALTER TABLE citizens ENABLE ROW LEVEL SECURITY;\n",
+            encoding="utf-8",
+        )
+        return tmp_path
+
+    def test_output_to_tmp_writes_file(
+        self, lovable_project: Path, tmp_path: Path
+    ) -> None:
+        out = tmp_path / "reclaim-report.md"
+        result = runner.invoke(
+            app,
+            [
+                "reclaim",
+                "harden",
+                "--path",
+                str(lovable_project),
+                "--output",
+                str(out),
+            ],
+        )
+        assert out.exists(), result.output
+        content = out.read_text()
+        assert "AEOS Reclaim Harden Report" in content
+        assert "read_only:     true" in content
+        assert "applied:       false" in content
+
+    def test_output_no_client_files_modified(
+        self, lovable_project: Path, tmp_path: Path
+    ) -> None:
+        import os
+
+        files_before = {
+            p: os.path.getmtime(p) for p in lovable_project.rglob("*") if p.is_file()
+        }
+        out = tmp_path / "report.md"
+        runner.invoke(
+            app,
+            [
+                "reclaim",
+                "harden",
+                "--path",
+                str(lovable_project),
+                "--output",
+                str(out),
+            ],
+        )
+        for p, mtime in files_before.items():
+            assert os.path.getmtime(p) == mtime, f"File modified: {p}"
+
+    def test_output_no_secrets_in_file(
+        self, lovable_project: Path, tmp_path: Path
+    ) -> None:
+        out = tmp_path / "report.md"
+        runner.invoke(
+            app,
+            [
+                "reclaim",
+                "harden",
+                "--path",
+                str(lovable_project),
+                "--output",
+                str(out),
+            ],
+        )
+        if out.exists():
+            content = out.read_text().lower()
+            for pattern in ["eyj", "service_role_key", "sk-"]:
+                assert pattern not in content
+
+    def test_overwrite_replaces_existing(
+        self, lovable_project: Path, tmp_path: Path
+    ) -> None:
+        out = tmp_path / "report.md"
+        out.write_text("old content")
+        runner.invoke(
+            app,
+            [
+                "reclaim",
+                "harden",
+                "--path",
+                str(lovable_project),
+                "--output",
+                str(out),
+                "--overwrite",
+            ],
+        )
+        assert out.read_text() != "old content"
+        assert "AEOS Reclaim Harden Report" in out.read_text()
+
+    def test_no_overwrite_refuses_existing(
+        self, lovable_project: Path, tmp_path: Path
+    ) -> None:
+        out = tmp_path / "report.md"
+        out.write_text("old content")
+        result = runner.invoke(
+            app,
+            [
+                "reclaim",
+                "harden",
+                "--path",
+                str(lovable_project),
+                "--output",
+                str(out),
+            ],
+        )
+        assert result.exit_code == 1
+        assert out.read_text() == "old content"
 
 
 # ---------------------------------------------------------------------------

@@ -19,6 +19,7 @@ from aeos.providers.supabase import (
     run_supabase_check,
 )
 from aeos.reclaim import run_reclaim_harden, run_reclaim_inspect
+from aeos.reclaim.hardener import build_harden_report
 from aeos.report import generate_report
 from aeos.security import run_security_check as run_sec_check
 from aeos.sovereignty import run_sovereignty_check
@@ -1549,76 +1550,149 @@ _STATUS_ICONS: dict[str, str] = {
 }
 
 
+def _reclaim_harden_json(
+    result: object,
+    output_written: bool,
+    output_path: str,
+) -> dict[str, object]:
+    """Build the JSON payload for the reclaim harden command."""
+    from aeos.reclaim.hardener import ReclaimHardenResult
+
+    assert isinstance(result, ReclaimHardenResult)  # noqa: S101
+
+    s = result.summary
+    rls_data: dict[str, object] | None = None
+    if result.rls is not None:
+        rls = result.rls
+        rls_data = {
+            "status": rls.status,
+            "verdict": rls.review.verdict,
+            "generated_blocks": rls.summary.auto_blocks,
+            "todo_blocks": rls.summary.todo_blocks,
+            "blocked_blocks": rls.summary.blocked_blocks,
+            "migrations_scanned": rls.migrations_scanned,
+        }
+    supa_data: dict[str, object] | None = None
+    if result.supabase is not None:
+        sup = result.supabase
+        supa_data = {
+            "status": sup.status,
+            "supabase_detected": sup.supabase_detected,
+            "requires_manual_action": sup.requires_manual_action,
+        }
+    return {
+        "status": result.status,
+        "read_only": result.read_only,
+        "applied": result.applied,
+        "output_written": output_written,
+        "output_path": output_path,
+        "project_path": str(result.path),
+        "summary": {
+            "generator_detected": s.generator_detected,
+            "providers_detected": s.providers_detected,
+            "control_level": s.control_level,
+            "secrets_exposure": s.secrets_exposure,
+            "security_status": s.security_status,
+            "sovereignty_status": s.sovereignty_status,
+            "supabase_status": s.supabase_status,
+            "rls_verdict": s.rls_verdict,
+            "generated_actions": s.generated_actions,
+            "manual_actions": s.manual_actions,
+            "critical_findings": s.critical_findings,
+            "important_findings": s.important_findings,
+        },
+        "reclaim": {
+            "status": result.reclaim.status,
+            "control_map": {
+                "portability": result.reclaim.control_map.portability,
+                "secrets_exposure": result.reclaim.control_map.secrets_exposure,
+                "backend_runtime": result.reclaim.control_map.backend_runtime,
+            },
+        },
+        "security": {
+            "status": result.security.status,
+            "findings_count": len(result.security.findings),
+        },
+        "sovereignty": {
+            "status": result.sovereignty.status,
+            "findings_count": len(result.sovereignty.findings),
+        },
+        "supabase": supa_data,
+        "rls": rls_data,
+        "recommendations": result.recommendations,
+        "exit_options": result.exit_options,
+    }
+
+
 @reclaim_app.command("harden")
 def reclaim_harden(
     path: str = typer.Option(".", "--path", "-p", help="Path to project."),
     json_output: bool = typer.Option(False, "--json", help="JSON output."),
+    output: str = typer.Option(
+        "",
+        "--output",
+        "-o",
+        help="Write a Markdown report to this file.",
+    ),
+    overwrite: bool = typer.Option(
+        False,
+        "--overwrite",
+        help="Overwrite the output file if it already exists.",
+    ),
 ) -> None:
     """Orchestrate the full project reclaim analysis (read-only)."""
     result = run_reclaim_harden(Path(path))
     s = result.summary
 
+    output_written = False
+    output_path_str = ""
+
+    # ── --output mode: build report → conditional write ──────────────────────
+    if output:
+        output_path = Path(output)
+        if output_path.exists() and not overwrite:
+            typer.echo(
+                f"Export refused — '{output_path}' already exists.\n"
+                "Pass --overwrite to replace it.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+
+        content = build_harden_report(result)
+        output_path.write_text(content, encoding="utf-8")
+        output_written = True
+        output_path_str = str(output_path)
+
+        if json_output:
+            typer.echo(
+                json.dumps(
+                    _reclaim_harden_json(result, output_written, output_path_str),
+                    indent=2,
+                )
+            )
+            if result.status == "ERROR":
+                raise typer.Exit(code=1)
+            return
+
+        status_label = _STATUS_ICONS.get(result.status, result.status)
+        typer.echo(f"Status:           {status_label}")
+        typer.echo(f"Exported:         {output_path}")
+        typer.echo(f"Critical risks:   {s.critical_findings}")
+        typer.echo(f"Manual actions:   {s.manual_actions}")
+        typer.echo(f"Generatable SQL:  {s.generated_actions} block(s)")
+        typer.echo("Read-only — no files modified, no migration applied.")
+        typer.echo("  read_only: true  ·  applied: false")
+        if result.status == "ERROR":
+            raise typer.Exit(code=1)
+        return
+
     if json_output:
-        rls_data: dict[str, object] | None = None
-        if result.rls is not None:
-            rls = result.rls
-            rls_data = {
-                "status": rls.status,
-                "verdict": rls.review.verdict,
-                "generated_blocks": rls.summary.auto_blocks,
-                "todo_blocks": rls.summary.todo_blocks,
-                "blocked_blocks": rls.summary.blocked_blocks,
-                "migrations_scanned": rls.migrations_scanned,
-            }
-        supa_data: dict[str, object] | None = None
-        if result.supabase is not None:
-            sup = result.supabase
-            supa_data = {
-                "status": sup.status,
-                "supabase_detected": sup.supabase_detected,
-                "requires_manual_action": sup.requires_manual_action,
-            }
-        data: dict[str, object] = {
-            "status": result.status,
-            "read_only": result.read_only,
-            "applied": result.applied,
-            "project_path": str(result.path),
-            "summary": {
-                "generator_detected": s.generator_detected,
-                "providers_detected": s.providers_detected,
-                "control_level": s.control_level,
-                "secrets_exposure": s.secrets_exposure,
-                "security_status": s.security_status,
-                "sovereignty_status": s.sovereignty_status,
-                "supabase_status": s.supabase_status,
-                "rls_verdict": s.rls_verdict,
-                "generated_actions": s.generated_actions,
-                "manual_actions": s.manual_actions,
-                "critical_findings": s.critical_findings,
-                "important_findings": s.important_findings,
-            },
-            "reclaim": {
-                "status": result.reclaim.status,
-                "control_map": {
-                    "portability": result.reclaim.control_map.portability,
-                    "secrets_exposure": result.reclaim.control_map.secrets_exposure,
-                    "backend_runtime": result.reclaim.control_map.backend_runtime,
-                },
-            },
-            "security": {
-                "status": result.security.status,
-                "findings_count": len(result.security.findings),
-            },
-            "sovereignty": {
-                "status": result.sovereignty.status,
-                "findings_count": len(result.sovereignty.findings),
-            },
-            "supabase": supa_data,
-            "rls": rls_data,
-            "recommendations": result.recommendations,
-            "exit_options": result.exit_options,
-        }
-        typer.echo(json.dumps(data, indent=2))
+        typer.echo(
+            json.dumps(
+                _reclaim_harden_json(result, output_written, output_path_str),
+                indent=2,
+            )
+        )
         if result.status == "ERROR":
             raise typer.Exit(code=1)
         return
