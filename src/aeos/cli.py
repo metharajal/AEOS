@@ -1554,6 +1554,7 @@ def _reclaim_harden_json(
     result: object,
     output_written: bool,
     output_path: str,
+    memory_record_path: str = "",
 ) -> dict[str, object]:
     """Build the JSON payload for the reclaim harden command."""
     from aeos.reclaim.hardener import ReclaimHardenResult
@@ -1622,6 +1623,7 @@ def _reclaim_harden_json(
         "recommendations": result.recommendations,
         "exit_options": result.exit_options,
         "remediation_plan": _remediation_plan_json(result),
+        "memory_record_path": memory_record_path,
     }
 
 
@@ -1670,6 +1672,12 @@ def reclaim_harden(
         "--overwrite",
         help="Overwrite the output file if it already exists.",
     ),
+    memory_dir: str = typer.Option(
+        "",
+        "--memory-dir",
+        help="Save a memory record (JSON) to this local directory.",
+        hidden=True,
+    ),
 ) -> None:
     """Orchestrate the full project reclaim analysis (read-only)."""
     result = run_reclaim_harden(Path(path))
@@ -1677,6 +1685,17 @@ def reclaim_harden(
 
     output_written = False
     output_path_str = ""
+
+    # ── --memory-dir: build and save a local memory record ───────────────────
+    _memory_record_path: str = ""
+    if memory_dir:
+        from aeos.memory.store import (
+            build_memory_record_from_reclaim_harden,
+            save_record,
+        )
+
+        _mr = build_memory_record_from_reclaim_harden(result, Path(path))
+        _memory_record_path = str(save_record(_mr, Path(memory_dir)))
 
     # ── --output mode: build report → conditional write ──────────────────────
     if output:
@@ -1697,7 +1716,12 @@ def reclaim_harden(
         if json_output:
             typer.echo(
                 json.dumps(
-                    _reclaim_harden_json(result, output_written, output_path_str),
+                    _reclaim_harden_json(
+                        result,
+                        output_written,
+                        output_path_str,
+                        _memory_record_path,
+                    ),
                     indent=2,
                 )
             )
@@ -1711,6 +1735,8 @@ def reclaim_harden(
         typer.echo(f"Critical risks:   {s.critical_findings}")
         typer.echo(f"Manual actions:   {s.manual_actions}")
         typer.echo(f"Generatable SQL:  {s.generated_actions} block(s)")
+        if _memory_record_path:
+            typer.echo(f"Memory:           {_memory_record_path}")
         typer.echo("Read-only — no files modified, no migration applied.")
         typer.echo("  read_only: true  ·  applied: false")
         if result.status == "ERROR":
@@ -1720,7 +1746,12 @@ def reclaim_harden(
     if json_output:
         typer.echo(
             json.dumps(
-                _reclaim_harden_json(result, output_written, output_path_str),
+                _reclaim_harden_json(
+                    result,
+                    output_written,
+                    output_path_str,
+                    _memory_record_path,
+                ),
                 indent=2,
             )
         )
@@ -1842,6 +1873,10 @@ def reclaim_harden(
             icon = _PRIO_ICON.get(ph.priority, "·")
             typer.echo(f"  {icon} [{ph.priority:<8}] {ph.id} — {ph.label}")
         typer.echo("  → Run with --output to export the full plan.")
+        typer.echo("")
+
+    if _memory_record_path:
+        typer.echo(f"Memory:           {_memory_record_path}")
         typer.echo("")
 
     typer.echo(
