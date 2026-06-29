@@ -20,6 +20,15 @@ from aeos.memory.store import (
     load_record,
     save_record,
 )
+from aeos.memory.timeline import (
+    MemoryTimelineEntry,
+    MemoryTimelineResult,
+    MemoryTimelineSynthesis,
+    build_timeline,
+    compute_timeline_synthesis,
+    load_project_records,
+    timeline_to_dict,
+)
 
 __all__ = [
     "MemoryCompareDelta",
@@ -27,12 +36,19 @@ __all__ = [
     "MemoryListResult",
     "MemoryRecord",
     "MemoryRecordSummary",
+    "MemoryTimelineEntry",
+    "MemoryTimelineResult",
+    "MemoryTimelineSynthesis",
     "build_memory_record_from_reclaim_harden",
+    "build_timeline",
     "compare_records",
+    "compute_timeline_synthesis",
     "compute_trend",
     "find_record_path",
     "list_records",
+    "load_project_records",
     "load_record",
     "load_record_reference",
     "save_record",
+    "timeline_to_dict",
 ]

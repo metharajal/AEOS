@@ -10,29 +10,31 @@
 
 | Élément | État |
 |---|---|
-| Branche `main` | `a8f7e51` — Sprint 3G-1 mergé |
-| CI | Verte (1342 tests — sprint 3H local) |
-| AEOS CLI | `aeos reclaim harden`, `aeos memory list`, `aeos memory show`, `aeos memory compare` |
+| Branche `main` | `f7ed7e9` — Sprint 3H-1 mergé |
+| CI | Verte (1364 tests — sprint 3I local) |
+| AEOS CLI | `reclaim harden`, `memory list`, `memory show`, `memory compare`, `memory timeline` |
 | Memory Write | Sprint 3F — mergé, stable |
 | Memory Read CLI | Sprint 3G — mergé dans main (PR #36) |
-| Memory Usage Docs | Sprint 3G-1 — mergé dans main (PR #37) |
-| Memory Compare | Sprint 3H — **en attente de merge** (branch `sprint3h/memory-compare`) |
+| Memory Compare | Sprint 3H — mergé dans main (PR #38) |
+| Memory Compare Validation | Sprint 3H-1 — mergé dans main (PR #39) |
+| Memory Timeline | Sprint 3I — **en attente de merge** (branch `sprint3i/memory-timeline-mvp`) |
 | `ma-mairie-digitale` | Untouched — projet client intact |
 | `.env` | Non lu, non tracké, non copié |
 
 ---
 
-## 2. Chaîne Memory disponible
+## 2. Chaîne Memory disponible dans main
 
 ```
-aeos reclaim harden --path <project> --memory-dir <dir>               →  crée un MemoryRecord
-aeos memory list   --memory-dir <dir>                                  →  liste tous les records
-aeos memory show   --memory-dir <dir> --record <id>                    →  affiche un record
-aeos memory compare --memory-dir <dir> --left <id> --right <id>        →  compare deux records
+aeos reclaim harden  --path <project> --memory-dir <dir>               →  crée un MemoryRecord
+aeos memory list     --memory-dir <dir>                                 →  liste tous les records
+aeos memory show     --memory-dir <dir> --record <id>                   →  affiche un record
+aeos memory compare  --memory-dir <dir> --left <id> --right <id>        →  compare deux records
+aeos memory timeline --memory-dir <dir> --project <name>                →  timeline du projet
 ```
 
 Tous les modes `--json` sont disponibles. Tout est read-only. Aucun secret. Aucune DB.
-Sprint 3H (`memory compare`) est sur la branche `sprint3h/memory-compare` — pas encore dans main.
+Sprint 3I (`memory timeline`) est sur la branche `sprint3i/memory-timeline-mvp` — PR en attente.
 
 ---
 
@@ -40,24 +42,17 @@ Sprint 3H (`memory compare`) est sur la branche `sprint3h/memory-compare` — pa
 
 ### Priorité 1 — Sprint 3H : Memory Compare (DONE)
 
-**Statut :** Livré — branch `sprint3h/memory-compare`, PR à créer.
-
-```bash
-aeos memory compare --memory-dir <dir> --left <id> --right <id> [--json]
-```
+**Statut :** Livré et mergé — PR #38 (`401d485`).
 
 ---
 
-### Priorité 2 — Sprint 3I : Memory Timeline
+### Priorité 2 — Sprint 3I : Memory Timeline (DONE)
 
-**Objectif :** Visualiser l'évolution d'un projet dans le temps à partir de plusieurs records.
+**Statut :** Livré — branch `sprint3i/memory-timeline-mvp`, PR en attente de merge.
 
 ```bash
-aeos memory timeline --memory-dir <dir> --project <project_name>
+aeos memory timeline --memory-dir <dir> --project <name> [--json]
 ```
-
-Affiche une vue chronologique de tous les records pour un même projet :
-date · status · critical · control_level.
 
 ---
 
@@ -162,3 +157,4 @@ uv run aeos memory show \
 | 2026-06-29 | Sprint 3G livré — Memory Read CLI (list + show), 28 tests |
 | 2026-06-29 | Sprint 3G-1 — documentation usage Memory CLI, prochains sprints 3H/3I/4A |
 | 2026-06-29 | Sprint 3H — Memory Compare livré (26 tests, `aeos memory compare`) |
+| 2026-06-30 | Sprint 3I — Memory Timeline livré (22 tests, `aeos memory timeline`) |

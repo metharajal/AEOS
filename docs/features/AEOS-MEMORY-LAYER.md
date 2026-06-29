@@ -1,8 +1,8 @@
 # AEOS Memory Layer
 
-**Date:** 2026-06-29
-**Status:** Feature — Sprint 3H (Compare available)
-**Sprints:** 3F (MVP write), 3G (Read CLI), 3H (Compare)
+**Date:** 2026-06-30
+**Status:** Feature — Sprint 3I (Timeline available)
+**Sprints:** 3F (MVP write), 3G (Read CLI), 3H (Compare), 3I (Timeline)
 **Module:** `src/aeos/memory/`
 
 ---
@@ -25,13 +25,14 @@ a structured record so that history is local, readable, and human-controllable.
 
 ## End-to-End Usage Guide
 
-The Memory Layer chain has four steps, each triggered by a separate command:
+The Memory Layer chain has five steps, each triggered by a separate command:
 
 ```
-aeos reclaim harden --memory-dir <dir>                       →  creates a MemoryRecord
-aeos memory list   --memory-dir <dir>                        →  lists all records
-aeos memory show   --memory-dir <dir> --record <id>          →  shows one record in detail
-aeos memory compare --memory-dir <dir> --left <id> --right <id>  →  compares two records
+aeos reclaim harden  --memory-dir <dir>                              →  creates a MemoryRecord
+aeos memory list     --memory-dir <dir>                              →  lists all records
+aeos memory show     --memory-dir <dir> --record <id>                →  shows one record
+aeos memory compare  --memory-dir <dir> --left <id> --right <id>     →  compares two records
+aeos memory timeline --memory-dir <dir> --project <project_name>     →  project timeline
 ```
 
 ### Step 1 — Create a MemoryRecord
@@ -196,6 +197,7 @@ aeos memory show \
 | Action | Status |
 |---|---|
 | Compare two records (diff) | **Done — Sprint 3H** (`aeos memory compare`) |
+| Project timeline | **Done — Sprint 3I** (`aeos memory timeline`) |
 | Search across records | Not yet — planned |
 | Modify a record | Never — all read operations are read-only |
 | Apply any fix from a record | Never without explicit human gate |
@@ -244,8 +246,11 @@ src/aeos/memory/
 ├── store.py           write: build_memory_record_from_reclaim_harden(), save_record()
 │                      read:  list_records(), load_record(), find_record_path()
 │                      guard: _looks_like_secret_value(), _iter_string_leaves()
-└── compare.py         MemoryCompareDelta, MemoryCompareResult
-                       compare_records(), load_record_reference(), compute_trend()
+├── compare.py         MemoryCompareDelta, MemoryCompareResult
+│                      compare_records(), load_record_reference(), compute_trend()
+└── timeline.py        MemoryTimelineEntry, MemoryTimelineResult, MemoryTimelineSynthesis
+                       load_project_records(), build_timeline()
+                       compute_timeline_synthesis(), timeline_to_dict()
 ```
 
 ---
@@ -450,6 +455,27 @@ record = load_record(Path("/tmp/aeos-memory"), "ma-mairie-digitale-20260629T1156
 path = find_record_path(Path("/tmp/aeos-memory"), "ma-mairie-digitale-20260629T115627-e94541fc")
 ```
 
+### Timeline (Sprint 3I)
+
+```python
+from aeos.memory import load_project_records, build_timeline, timeline_to_dict
+
+mem_dir = Path("/tmp/aeos-memory")
+
+# Load all records for a project, sorted chronologically
+records = load_project_records(mem_dir, "ma-mairie-digitale")
+
+# Build timeline (returns MemoryTimelineResult)
+result = build_timeline(records)
+result.memory_dir = str(mem_dir)
+
+print(result.synthesis.overall)  # "improved" | "degraded" | "unchanged" | ...
+print(result.synthesis.critical_trend)
+
+# Serialize to dict for JSON output
+payload = timeline_to_dict(result)
+```
+
 ### Compare (Sprint 3H)
 
 ```python
@@ -482,6 +508,9 @@ from aeos.memory import MemoryCompareDelta, MemoryCompareResult
 | `MemoryListResult` | Wraps `list[MemoryRecordSummary]` + `skipped_files` |
 | `MemoryCompareDelta` | Delta for a single field: field, left_value, right_value, trend |
 | `MemoryCompareResult` | Full comparison result: synthesis, improved, degraded, unchanged |
+| `MemoryTimelineEntry` | One row in the timeline: record_id, date, status, control_level, counts |
+| `MemoryTimelineSynthesis` | Global synthesis: overall trend, per-field trends, first/last status |
+| `MemoryTimelineResult` | Full timeline: project_name, entries, synthesis |
 
 ---
 
@@ -673,7 +702,108 @@ Read-only — no files modified.
 
 ---
 
-## 11. Real-World Validation Scenario (Sprint 3H-1)
+## 11. `aeos memory timeline` (Sprint 3I)
+
+Show the chronological audit history for a single project.
+
+```bash
+aeos memory timeline \
+  --memory-dir /tmp/aeos-memory \
+  --project ma-mairie-digitale
+```
+
+**Text output example (3 records over time):**
+
+```
+Memory Timeline — ma-mairie-digitale
+Directory: /tmp/aeos-memory
+Records:   3
+
+#    date                        status     ctrl          crit    imp   man   gen
+────────────────────────────────────────────────────────────────────────────────
+1    2026-06-01 08:00:00         ERROR      weak              5     72    15    25
+     ma-mairie-digitale-20260601T080000-a1b2c3d4
+2    2026-06-15 14:30:00         WARNING    partial           2     41     8    25
+     ma-mairie-digitale-20260615T143000-e5f6a7b8
+3    2026-06-29 21:40:00         WARNING    partial           2     35     6    25
+     ma-mairie-digitale-20260629T214000-c9d0e1f2
+
+── Synthesis ────────────────────────────────────────────
+  Status:    ERROR → WARNING  ↑
+  Overall:   improved
+  Critical:  ↑ improved
+  Important: ↑ improved
+  Manual:    ↑ improved
+  Generated: → unchanged
+
+Read-only — no files modified.
+```
+
+**JSON output:**
+
+```bash
+aeos memory timeline \
+  --memory-dir /tmp/aeos-memory \
+  --project ma-mairie-digitale \
+  --json
+```
+
+Returns:
+
+```json
+{
+  "project_name": "ma-mairie-digitale",
+  "memory_dir": "/tmp/aeos-memory",
+  "record_count": 3,
+  "entries": [
+    {
+      "record_id": "ma-mairie-digitale-20260601T080000-a1b2c3d4",
+      "created_at": "2026-06-01T08:00:00+00:00",
+      "status": "ERROR",
+      "control_level": "weak",
+      "critical": 5,
+      "important": 72,
+      "manual": 15,
+      "generated": 25
+    },
+    ...
+  ],
+  "synthesis": {
+    "record_count": 3,
+    "first_status": "ERROR",
+    "last_status": "WARNING",
+    "overall": "improved",
+    "critical_trend": "improved",
+    "important_trend": "improved",
+    "manual_trend": "improved",
+    "generated_trend": "unchanged"
+  }
+}
+```
+
+**Synthesis logic:**
+
+| `overall` value | Meaning |
+|---|---|
+| `improved` | Status improved between first and last record |
+| `degraded` | Status degraded between first and last record |
+| `unchanged` | Status identical between first and last record |
+| `insufficient_data` | Only one record — no trend computable |
+
+The `overall` field reflects the **status trend** (first → last). Each finding field
+(`critical_trend`, `important_trend`, `manual_trend`, `generated_trend`) is computed
+independently: lower count = `improved`, higher count = `degraded`.
+
+**Behaviour:**
+- If `--memory-dir` does not exist → clear error + exit code 1.
+- If no records found for `--project` → clear error + exit code 1.
+- One record → valid timeline, `synthesis.overall = insufficient_data`.
+- Records are always sorted chronologically by `created_at`.
+- Never reads `.env`. Never modifies any file.
+
+---
+
+## 12. Real-World Validation Scenario (Sprint 3H-1)
 
 This scenario was executed against `ma-mairie-digitale` on 2026-06-29 to confirm the
 full Memory chain works on a real project without touching the client.
@@ -791,26 +921,27 @@ some went up and others went down.
 
 ---
 
-## 12. Current Limits
+## 13. Current Limits
 
 | Limit | Detail |
 |---|---|
 | Single-command coverage | Only `reclaim harden` builds memory records. Other rails (security, supabase) are not yet wired. |
 | No memory search | Records must be browsed by record_id. Full-text or field-based search is planned. |
 | No deduplication | Each run creates a new file. Old records are not pruned automatically. |
-| No timeline view | Planned Sprint 3I — `aeos memory timeline --project <name>`. |
+| Timeline synthesis is first→last only | Intermediate fluctuations are not captured in the synthesis. Use per-entry data for fine-grained analysis. |
 
 ---
 
-## 12. Next Steps
+## 14. Next Steps
 
 | Item | Status |
 |---|---|
 | Memory MVP — `reclaim harden` | **Done — Sprint 3F** |
 | Memory read CLI (`aeos memory list`, `aeos memory show`) | **Done — Sprint 3G** |
 | Memory compare (`aeos memory compare`) | **Done — Sprint 3H** |
+| Memory timeline (`aeos memory timeline`) | **Done — Sprint 3I** |
 | Memory for other rails (security, supabase) | Planned |
-| Memory timeline — `aeos memory timeline --project <name>` | Planned — Sprint 3I |
+| Build Rail MVP (`aeos build scaffold`) | Planned — Sprint 4A |
 | Human validation workflow (`human_validated: true`, `notes`) | Planned |
 | Memory search (`aeos memory search`) | Planned |
 | Memory learn — pattern extraction from history | Future |
