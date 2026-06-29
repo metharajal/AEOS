@@ -10,65 +10,84 @@
 
 | Élément | État |
 |---|---|
-| Branche `main` | Propre, à jour avec `origin/main` |
-| CI | Verte (Quality Gate pass) |
+| Branche `main` | Propre, à jour avec `origin/main` — commit `4e6c06c` |
+| CI | Verte (Quality Gate pass — 1316 tests) |
 | AEOS CLI | Fonctionnel — `aeos reclaim harden`, `aeos memory list`, `aeos memory show` |
-| Workstation doc | Présente (`docs/operations/AEOS-AI-MAC-WORKSTATION-SETUP.md`) |
-| Memory Layer MVP | Mergé dans main — validé, lu par CLI |
-| Memory Read CLI | **Sprint 3G livré** — `aeos memory list` + `aeos memory show` |
+| Memory Write | Sprint 3F — mergé, stable |
+| Memory Read CLI | Sprint 3G — **mergé** dans main (PR #36) |
+| Memory Usage Docs | Sprint 3G-1 — en cours |
 | `ma-mairie-digitale` | Untouched — projet client intact |
 | `.env` | Non lu, non tracké, non copié |
 
 ---
 
-## 2. Sprint actif — sprint3g/memory-read-cli (livré)
-
-### Livraisons sprint3g
+## 2. Chaîne Memory disponible dans main
 
 ```
-src/aeos/memory/models.py        — MemoryRecordSummary, MemoryListResult
-src/aeos/memory/store.py         — list_records(), load_record(), find_record_path()
-src/aeos/memory/__init__.py      — exports publics mis à jour
-src/aeos/cli.py                  — aeos memory list, aeos memory show
-tests/unit/test_memory_cli.py    — 28 tests unitaires
-docs/features/AEOS-MEMORY-LAYER.md — section Memory Read CLI + limites + next steps
+aeos reclaim harden --path <project> --memory-dir <dir>   →  crée un MemoryRecord JSON
+aeos memory list   --memory-dir <dir>                      →  liste tous les records
+aeos memory show   --memory-dir <dir> --record <id>        →  affiche un record en détail
 ```
 
-**Commandes livrées :**
-
-```bash
-aeos memory list --memory-dir /tmp/aeos-memory
-aeos memory list --memory-dir /tmp/aeos-memory --json
-aeos memory show --memory-dir /tmp/aeos-memory --record <record_id>
-aeos memory show --memory-dir /tmp/aeos-memory --record <record_id> --json
-```
+Tous les modes `--json` sont disponibles. Tout est read-only. Aucun secret. Aucune DB.
 
 ---
 
-## 3. Priorités par ordre
+## 3. Prochains sprints recommandés
 
-### Priorité 1 — Merger sprint3g dans main
+### Priorité 1 — Sprint 3H : Memory Compare (recommandé)
 
-La PR sprint3g/memory-read-cli est prête à merger.
-Vérifier la CI puis merger.
+**Objectif :** Comparer deux records pour mesurer la progression entre deux audits.
 
-### Priorité 2 — Memory pour les autres rails
+```bash
+aeos memory compare --memory-dir <dir> --record-a <id> --record-b <id>
+```
 
-Après stabilisation du read CLI :
+Affiche :
+- delta des findings (critical, important, manual, generated)
+- changement de status (ERROR → WARNING, etc.)
+- delta de control_level
+- évolution du remediation_summary
 
-- Wirer `aeos security check --memory-dir` → écrire des MemoryRecord pour le rail Security
-- Wirer `aeos supabase check --memory-dir` → écrire des MemoryRecord pour le rail Supabase
+Sans modifier aucun fichier. Read-only.
 
-### Priorité 3 — Compare / Diff
+---
 
-- Comparer deux records successifs pour un même projet
-- `aeos memory diff --memory-dir <dir> --record-a <id> --record-b <id>`
+### Priorité 2 — Sprint 3I : Memory Timeline
 
-### Priorité 4 — Validation humaine
+**Objectif :** Visualiser l'évolution d'un projet dans le temps à partir de plusieurs records.
 
-- Permettre à l'humain de marquer un record comme validé
-- `aeos memory validate --memory-dir <dir> --record <id>`
-- `aeos memory note --memory-dir <dir> --record <id> --text "note"`
+```bash
+aeos memory timeline --memory-dir <dir> --project <project_name>
+```
+
+Affiche une vue chronologique de tous les records pour un même projet :
+date · status · critical · control_level.
+
+---
+
+### Priorité 3 — Sprint 4A : Build Rail MVP
+
+**Objectif :** Démarrer le rail Build — scaffolding de projets AEOS-native.
+
+Premier jalon :
+```bash
+aeos build scaffold --name <project> --type python
+```
+
+Génère un projet Python AEOS-native avec :
+`pyproject.toml`, `src/`, `tests/`, `docs/`, `.gitignore`, `aeos.toml`, CI skeleton.
+
+---
+
+### Horizon — autres priorités mémoire
+
+| Sprint | Objectif |
+|---|---|
+| Memory pour Security/Supabase | Wirer `--memory-dir` sur les autres rails |
+| Memory validate | `aeos memory validate --record <id>` — marquer comme validé humainement |
+| Memory note | `aeos memory note --record <id> --text "..."` — annoter un record |
+| Memory search | Recherche dans les records par field ou texte libre |
 
 ---
 
@@ -113,22 +132,29 @@ Then:
 ## 6. Prochaine séquence recommandée
 
 ```bash
-# 1. Merger sprint3g
-gh pr merge <pr_number> --squash
+# 1. Valider la chaîne complète sur un vrai audit
+uv run aeos reclaim harden \
+  --path ~/aeos-client-audits/ma-mairie-digitale \
+  --output /tmp/ma-mairie-report.md \
+  --memory-dir /tmp/aeos-memory
 
-# 2. Vérifier le CLI après merge
-uv run aeos memory list --help
-uv run aeos memory show --help
+# 2. Lister les records
+uv run aeos memory list --memory-dir /tmp/aeos-memory
 
-# 3. Tester sur un vrai audit
-uv run aeos reclaim harden --path ~/aeos-client-audits/ma-mairie-digitale \
-  --memory-dir /tmp/aeos-memory-test
-uv run aeos memory list --memory-dir /tmp/aeos-memory-test
-uv run aeos memory show --memory-dir /tmp/aeos-memory-test \
+# 3. Afficher le record en détail
+uv run aeos memory show \
+  --memory-dir /tmp/aeos-memory \
   --record <record_id_from_list>
 
-# 4. Décider du prochain sprint avec le CTO
-# → memory diff, ou rails supplémentaires, ou validation humaine
+# 4. Valider en JSON
+uv run aeos memory list --memory-dir /tmp/aeos-memory --json
+uv run aeos memory show \
+  --memory-dir /tmp/aeos-memory \
+  --record <record_id> \
+  --json
+
+# 5. Démarrer Sprint 3H avec le CTO
+# → aeos memory compare
 ```
 
 ---
@@ -139,3 +165,4 @@ uv run aeos memory show --memory-dir /tmp/aeos-memory-test \
 |---|---|
 | 2026-06-29 | Création initiale — état post-sprint3f, memory layer mergé |
 | 2026-06-29 | Sprint 3G livré — Memory Read CLI (list + show), 28 tests |
+| 2026-06-29 | Sprint 3G-1 — documentation usage Memory CLI, prochains sprints 3H/3I/4A |

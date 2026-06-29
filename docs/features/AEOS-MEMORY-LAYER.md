@@ -1,8 +1,8 @@
 # AEOS Memory Layer
 
 **Date:** 2026-06-29
-**Status:** Feature — MVP
-**Sprint:** 3F
+**Status:** Feature — Sprint 3G (Read CLI available)
+**Sprints:** 3F (MVP write), 3G (Read CLI)
 **Module:** `src/aeos/memory/`
 
 ---
@@ -20,6 +20,203 @@ The layer implements the third pillar of the AEOS architecture:
 
 In this MVP, "learning" means _persisting_: every audit run can optionally write
 a structured record so that history is local, readable, and human-controllable.
+
+---
+
+## End-to-End Usage Guide
+
+The Memory Layer chain has three steps, each triggered by a separate command:
+
+```
+aeos reclaim harden --memory-dir <dir>   →   creates a MemoryRecord JSON file
+aeos memory list   --memory-dir <dir>    →   lists all records in that directory
+aeos memory show   --memory-dir <dir> --record <id>   →   shows one record in detail
+```
+
+### Step 1 — Create a MemoryRecord
+
+Run `aeos reclaim harden` with `--memory-dir` pointing to a directory **outside**
+the audited project. AEOS writes a structured JSON snapshot of the audit result.
+
+```bash
+aeos reclaim harden \
+  --path ~/aeos-client-audits/ma-mairie-digitale \
+  --output /tmp/ma-mairie-report.md \
+  --memory-dir /tmp/aeos-memory
+```
+
+Output includes:
+
+```
+Status:           ERROR ✗
+Exported:         /tmp/ma-mairie-report.md
+Critical risks:   3
+Manual actions:   15
+Generatable SQL:  25 block(s)
+Memory:           /tmp/aeos-memory/ma-mairie-digitale/ma-mairie-digitale-20260629T115627-e94541fc.json
+Read-only — no files modified, no migration applied.
+  read_only: true  ·  applied: false
+```
+
+The `Memory:` line shows the exact path of the JSON file that was written.
+
+**Why the memory directory must be outside the client project:**
+The `--memory-dir` path must not be inside the audited project directory.
+If it were, AEOS would be writing files into a project it is supposed to audit
+read-only — violating the `OUTPUT BEFORE WRITE` and `GATE BEFORE APPLY` doctrines.
+A separate directory (e.g. `/tmp/aeos-memory` or `~/.aeos/memory`) keeps the
+memory store decoupled from the project being analysed.
+
+---
+
+### Step 2 — List records
+
+```bash
+aeos memory list --memory-dir /tmp/aeos-memory
+```
+
+Output:
+
+```
+Memory Records — /tmp/aeos-memory
+Records found: 1
+
+  record_id:      ma-mairie-digitale-20260629T115627-e94541fc
+  project_name:   ma-mairie-digitale
+  created_at:     2026-06-29T11:56:27.260150+00:00
+  source_command: reclaim harden
+  status:         ERROR
+  generator:      lovable
+  providers:      1
+
+Read-only — no files modified.
+```
+
+JSON variant:
+
+```bash
+aeos memory list --memory-dir /tmp/aeos-memory --json
+```
+
+```json
+{
+  "memory_dir": "/tmp/aeos-memory",
+  "total": 1,
+  "records": [
+    {
+      "record_id": "ma-mairie-digitale-20260629T115627-e94541fc",
+      "project_name": "ma-mairie-digitale",
+      "created_at": "2026-06-29T11:56:27.260150+00:00",
+      "source_command": "reclaim harden",
+      "status": "ERROR",
+      "generator_detected": "lovable",
+      "provider_count": 1
+    }
+  ],
+  "skipped_files": []
+}
+```
+
+---
+
+### Step 3 — Show a record in detail
+
+Copy the `record_id` from the list output and pass it to `memory show`:
+
+```bash
+aeos memory show \
+  --memory-dir /tmp/aeos-memory \
+  --record ma-mairie-digitale-20260629T115627-e94541fc
+```
+
+Output:
+
+```
+Memory Record — ma-mairie-digitale-20260629T115627-e94541fc
+
+  project_name:   ma-mairie-digitale
+  project_path:   /Users/user/aeos-client-audits/ma-mairie-digitale
+  created_at:     2026-06-29T11:56:27.260150+00:00
+  source_command: reclaim harden
+  status:         ERROR
+  read_only:      True
+  applied:        False
+  human_validated:False
+  generator:      lovable
+  providers:      supabase
+  control_level:  weak
+
+── Findings Summary ─────────────────────────────────────
+  critical     3
+  important    72
+  manual       15
+  generated    25
+
+── Remediation Summary ──────────────────────────────────
+  phases_count         5
+  immediate            3
+  manual               8
+  generatable          25
+  strategic            5
+
+── Strategic Options ────────────────────────────────────
+  1. [low/partial] Stay on current provider but secure
+  2. [medium/medium] Migrate to own Supabase Cloud project
+  3. [high/high] Migrate to self-hosted Supabase
+  4. [very_high/very_high] Migrate to PostgreSQL + open backend
+  5. [extreme/maximum] Full sovereign rebuild
+
+Read-only — no files modified.
+```
+
+JSON variant:
+
+```bash
+aeos memory show \
+  --memory-dir /tmp/aeos-memory \
+  --record ma-mairie-digitale-20260629T115627-e94541fc \
+  --json
+```
+
+---
+
+### What AEOS does in this chain
+
+| Action | Done by AEOS |
+|---|---|
+| Audit the project | Yes — `reclaim harden` |
+| Build a safe JSON snapshot | Yes — secret guard enforced |
+| Write the record to disk | Yes — to `<memory_dir>/<project_name>/` |
+| List records | Yes — `aeos memory list` |
+| Show a record in detail | Yes — `aeos memory show` |
+
+### What AEOS does NOT do (yet)
+
+| Action | Status |
+|---|---|
+| Compare two records (diff) | Not yet — planned Sprint 3H |
+| Search across records | Not yet — planned |
+| Modify a record | Never — all read operations are read-only |
+| Apply any fix from a record | Never without explicit human gate |
+| Read `.env` | Never |
+| Display secret values | Never |
+| Contact any database or API | Never |
+| Write inside the audited project | Never |
+
+---
+
+### Memory guarantees
+
+| Invariant | Enforced by |
+|---|---|
+| `read_only: true` in every record | `build_memory_record_from_reclaim_harden` hardcodes it |
+| `applied: false` in every record | Same |
+| No secret values stored | `save_record` scans all strings before writing |
+| No `.env` read | Memory module never opens secrets files |
+| No network access | Pure local filesystem writes |
+| Memory dir outside audited project | Required by `save_record` convention |
+| No database connection | No SQL, no Supabase, no migrations |
+| `human_validated: false` by default | Humans set it to `true` after review |
 
 ---
 
@@ -41,9 +238,11 @@ a structured record so that history is local, readable, and human-controllable.
 
 ```
 src/aeos/memory/
-├── __init__.py        public API: MemoryRecord, build_memory_record_from_reclaim_harden, save_record
-├── models.py          MemoryRecord dataclass
-└── store.py           build_memory_record_from_reclaim_harden(), save_record(), secret guard
+├── __init__.py        public API — see Section 8
+├── models.py          MemoryRecord, MemoryRecordSummary, MemoryListResult
+└── store.py           write: build_memory_record_from_reclaim_harden(), save_record()
+                       read:  list_records(), load_record(), find_record_path()
+                       guard: _looks_like_secret_value(), _iter_string_leaves()
 ```
 
 ---
@@ -219,12 +418,46 @@ These invariants are enforced in code and verified by tests.
 
 ## 8. Public API
 
+### Write (Sprint 3F)
+
 ```python
-from aeos.memory import MemoryRecord, build_memory_record_from_reclaim_harden, save_record
+from aeos.memory import build_memory_record_from_reclaim_harden, save_record
 
 record = build_memory_record_from_reclaim_harden(result, Path("/path/to/project"))
 record_path = save_record(record, Path("/tmp/aeos-memory"))
+# → /tmp/aeos-memory/<project_name>/<record_id>.json
 ```
+
+### Read (Sprint 3G)
+
+```python
+from aeos.memory import list_records, load_record, find_record_path
+
+# List all records in a directory (returns MemoryListResult)
+result = list_records(Path("/tmp/aeos-memory"))
+for summary in result.records:
+    print(summary.record_id, summary.status)
+for bad_file in result.skipped_files:
+    print("Skipped:", bad_file)
+
+# Load a full record by ID (returns MemoryRecord)
+record = load_record(Path("/tmp/aeos-memory"), "ma-mairie-digitale-20260629T115627-e94541fc")
+
+# Find the file path for a given record_id
+path = find_record_path(Path("/tmp/aeos-memory"), "ma-mairie-digitale-20260629T115627-e94541fc")
+```
+
+### Models
+
+```python
+from aeos.memory import MemoryRecord, MemoryRecordSummary, MemoryListResult
+```
+
+| Model | Used for |
+|---|---|
+| `MemoryRecord` | Full record — all fields |
+| `MemoryRecordSummary` | Lightweight view for `list` output |
+| `MemoryListResult` | Wraps `list[MemoryRecordSummary]` + `skipped_files` |
 
 ---
 

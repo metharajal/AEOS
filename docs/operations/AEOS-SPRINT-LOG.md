@@ -240,3 +240,70 @@
 **PR / Commit :** PR #33 — `5f2c1ed`  
 **Statut :** DONE  
 **Validation :** Document présent dans `docs/operations/`, CI verte, mergé dans main.
+
+---
+
+## Sprint 3F-1 — CTO Handoff and Continuity Notes
+
+**Objectif :** Documenter le protocole de reprise AEOS pour assurer la continuité entre sessions et entre agents.
+
+- `docs/operations/AEOS-CTO-HANDOFF.md` — vision, doctrine, rails, rôles agents, règles de sécurité, état actuel
+- Document vivant, à mettre à jour à chaque décision structurante
+
+**PR / Commit :** PR #34 — `1f2f6f5`  
+**Statut :** DONE  
+**Validation :** Document présent dans `docs/operations/`, CI verte, mergé dans main.
+
+---
+
+## Sprint 3F-3 — Multi-Agent Operating Model
+
+**Objectif :** Documenter comment AEOS doit être développé avec plusieurs IA sans perdre la continuité, la sécurité ni la souveraineté.
+
+- `docs/operations/AEOS-MULTI-AGENT-WORKFLOW.md` — rôles ChatGPT, Claude Code, Codex, IA locale, Antigravity
+- Protocole obligatoire avant chaque tâche agent (7 documents à lire)
+- Règles interdites non négociables
+- Checks obligatoires avant PR
+- Modèle opérationnel : "ChatGPT conseille. Le repo se souvient. Claude Code exécute. Codex travaille en parallèle. L'IA locale protège. Antigravity expérimente. GitHub prouve. L'humain valide."
+
+**PR / Commit :** PR #35 — `fee7187`  
+**Statut :** DONE  
+**Validation :** Document présent dans `docs/operations/`, CI verte, mergé dans main.
+
+---
+
+## Sprint 3G — Memory Read CLI
+
+**Objectif :** Ajouter les commandes de lecture mémoire pour compléter la chaîne :
+`reclaim harden → MemoryRecord → memory list → memory show`
+
+**Livraisons :**
+
+- `src/aeos/memory/models.py` — `MemoryRecordSummary`, `MemoryListResult`
+- `src/aeos/memory/store.py` — `list_records()`, `load_record()`, `find_record_path()`
+- `src/aeos/memory/__init__.py` — exports publics mis à jour
+- `src/aeos/cli.py` — sous-commande `memory` avec `list` et `show`
+- `tests/unit/test_memory_cli.py` — 28 tests unitaires
+
+**Commandes ajoutées :**
+
+```bash
+aeos memory list --memory-dir <dir>
+aeos memory list --memory-dir <dir> --json
+aeos memory show --memory-dir <dir> --record <record_id>
+aeos memory show --memory-dir <dir> --record <record_id> --json
+```
+
+**PR / Commit :** PR #36 — commit `f5dc4ff`, merge `4e6c06c`  
+**Statut :** DONE — mergé dans main, CI verte, 1316 tests passés  
+**Validation :** `uv run pytest` → 1316 passed. `aeos memory list` et `aeos memory show` fonctionnels.
+
+---
+
+## Sprint 3G-1 — Memory CLI Usage Documentation
+
+**Objectif :** Documenter proprement la chaîne Memory complète disponible dans AEOS.
+
+- `docs/features/AEOS-MEMORY-LAYER.md` — guide d'usage end-to-end, garanties, limites, API mise à jour
+- `docs/operations/AEOS-SPRINT-LOG.md` — entrées sprint 3F-1, 3F-3, 3G ajoutées
+- `docs/operations/AEOS-NEXT-ACTIONS.md` — priorités mises à jour (3H, 3I, 4A)
