@@ -1,8 +1,22 @@
 # AEOS CTO Handoff
 
-**Version :** 2026-06-29  
-**Auteur :** AEOS Operations / ChatGPT (CTO) + Claude Code (Execution)  
+**Version :** 2026-06-29
+**Auteur :** AEOS Operations / ChatGPT (CTO) + Claude Code (Execution)
 **Statut :** Document vivant — à mettre à jour à chaque décision structurante
+
+---
+
+## Documents à lire avant toute reprise
+
+Tout agent ou collaborateur reprenant le travail sur AEOS doit lire ces documents dans l'ordre :
+
+1. `docs/strategy/AEOS-PRODUCT-VISION.md`
+2. `docs/strategy/AEOS-PRODUCT-RAILS-AND-AGENTS.md`
+3. `docs/operations/AEOS-AI-MAC-WORKSTATION-SETUP.md`
+4. `docs/operations/AEOS-CTO-HANDOFF.md` ← ce document
+5. `docs/operations/AEOS-SPRINT-LOG.md`
+6. `docs/operations/AEOS-NEXT-ACTIONS.md`
+7. `docs/operations/AEOS-MULTI-AGENT-WORKFLOW.md`
 
 ---
 
@@ -84,11 +98,20 @@ AEOS n'est pas un outil. C'est une plateforme d'agents, de rails et de mémoire 
 - Peut prendre en charge des tâches isolées en parallèle (documentation, tests, refactoring).
 - Opère dans des branches dédiées sans affecter main.
 - Ne doit pas accéder aux secrets ou aux projets clients sans gate explicite.
+- Toute PR Codex doit être relue par un humain avant merge.
+
+### IA Locale (Ollama) — Souveraineté et analyse privée
+
+- Analyse privée de fichiers et de code sans envoi vers un modèle cloud.
+- Pré-audit local avant tout traitement par un modèle externe.
+- Gardien de la doctrine `AI-LOCAL-FIRST` : aucun code sensible vers le cloud par défaut.
+- Fondation future pour la mémoire locale AEOS.
 
 ### Antigravity (futur) — Expérimentation agentique
 
 - Réservé à l'expérimentation de nouveaux patterns agentiques.
 - Ne doit pas être utilisé en production sans validation AEOS.
+- Pas un outil principal pour AEOS aujourd'hui — utilisable seulement quand les gates seront matures.
 
 ---
 
@@ -163,3 +186,4 @@ tests/
 | 2026-06-29 | Memory Layer MVP mergé dans main | Fondation pour AEOS Agents |
 | 2026-06-29 | `--output` sur toutes les commandes write | Gate avant écriture repo |
 | 2026-06-29 | GitHub = source de vérité unique | Pas de dépendance à l'état local |
+| 2026-06-29 | Workflow multi-agent documenté | Continuité, sécurité, souveraineté entre agents |

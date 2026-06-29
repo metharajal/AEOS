@@ -102,17 +102,25 @@ Before doing any work on AEOS, read:
 * docs/operations/AEOS-CTO-HANDOFF.md
 * docs/operations/AEOS-SPRINT-LOG.md
 * docs/operations/AEOS-NEXT-ACTIONS.md
+* docs/operations/AEOS-MULTI-AGENT-WORKFLOW.md
 
 Then:
 
 * summarize the current state
 * identify the active sprint
+* confirm the active branch and its sync status with origin/main
 * propose a plan before modifying files
+* wait for human validation if the change is sensitive
 * never read .env
 * never display secrets
 * never touch client projects unless explicitly instructed
 * never apply fixes without a gate
+* never apply migrations or contact a database without explicit instruction
 ```
+
+Le workflow multi-agent complet est documenté dans `docs/operations/AEOS-MULTI-AGENT-WORKFLOW.md`.
+Ce document définit les rôles de ChatGPT, Claude Code, Codex, l'IA locale et Antigravity,
+ainsi que le protocole obligatoire avant chaque tâche agent.
 
 ---
 
@@ -148,3 +156,4 @@ uv run aeos memory --help
 | Date | Mise à jour |
 |---|---|
 | 2026-06-29 | Création initiale — état post-sprint3f, memory layer mergé |
+| 2026-06-29 | Ajout du workflow multi-agent (sprint3f3) — `AEOS-MULTI-AGENT-WORKFLOW.md` créé |
