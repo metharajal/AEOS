@@ -12,69 +12,63 @@
 |---|---|
 | Branche `main` | Propre, à jour avec `origin/main` |
 | CI | Verte (Quality Gate pass) |
-| AEOS CLI | Fonctionnel (`aeos --version`, `aeos reclaim harden`, `aeos memory`) |
+| AEOS CLI | Fonctionnel — `aeos reclaim harden`, `aeos memory list`, `aeos memory show` |
 | Workstation doc | Présente (`docs/operations/AEOS-AI-MAC-WORKSTATION-SETUP.md`) |
-| Memory Layer MVP | Mergé dans main — à consolider |
+| Memory Layer MVP | Mergé dans main — validé, lu par CLI |
+| Memory Read CLI | **Sprint 3G livré** — `aeos memory list` + `aeos memory show` |
 | `ma-mairie-digitale` | Untouched — projet client intact |
 | `.env` | Non lu, non tracké, non copié |
 
 ---
 
-## 2. Point d'attention immédiat
+## 2. Sprint actif — sprint3g/memory-read-cli (livré)
 
-### Commit `7139b77` — Memory Layer MVP
-
-```
-7139b77  feat(memory): add Memory Layer MVP — local-first diagnostic record store
-```
-
-Fichiers ajoutés dans ce commit :
+### Livraisons sprint3g
 
 ```
-src/aeos/memory/__init__.py
-src/aeos/memory/models.py
-src/aeos/memory/store.py
-tests/unit/test_memory_store.py   (573 lignes)
-docs/features/AEOS-MEMORY-LAYER.md
+src/aeos/memory/models.py        — MemoryRecordSummary, MemoryListResult
+src/aeos/memory/store.py         — list_records(), load_record(), find_record_path()
+src/aeos/memory/__init__.py      — exports publics mis à jour
+src/aeos/cli.py                  — aeos memory list, aeos memory show
+tests/unit/test_memory_cli.py    — 28 tests unitaires
+docs/features/AEOS-MEMORY-LAYER.md — section Memory Read CLI + limites + next steps
 ```
 
-**Ce commit est déjà dans `main`** (mergé via PR #33).
+**Commandes livrées :**
 
-**Actions à vérifier :**
-
-- [ ] Lire `docs/features/AEOS-MEMORY-LAYER.md` pour comprendre la spec
-- [ ] Lancer `pytest tests/unit/test_memory_store.py` pour valider les tests
-- [ ] Lancer `ruff check src/aeos/memory/` pour vérifier la qualité
-- [ ] Lancer `mypy src/aeos/memory/` pour vérifier les types
-- [ ] Vérifier si `aeos memory` est exposé dans `src/aeos/cli.py`
+```bash
+aeos memory list --memory-dir /tmp/aeos-memory
+aeos memory list --memory-dir /tmp/aeos-memory --json
+aeos memory show --memory-dir /tmp/aeos-memory --record <record_id>
+aeos memory show --memory-dir /tmp/aeos-memory --record <record_id> --json
+```
 
 ---
 
 ## 3. Priorités par ordre
 
-### Priorité 1 — Consolider Memory Layer
+### Priorité 1 — Merger sprint3g dans main
 
-Le Memory Layer MVP est mergé mais pas encore validé en détail.
+La PR sprint3g/memory-read-cli est prête à merger.
+Vérifier la CI puis merger.
 
-1. Inspecter `7139b77` : `git show 7139b77 --stat`
-2. Lire la spec : `docs/features/AEOS-MEMORY-LAYER.md`
-3. Valider les tests : `pytest tests/unit/test_memory_store.py -v`
-4. Vérifier la qualité : `ruff check src/aeos/memory/` et `mypy src/aeos/memory/`
-5. Vérifier l'intégration CLI : `aeos memory --help`
-6. Décider : consolider tel quel, corriger, ou étendre
+### Priorité 2 — Memory pour les autres rails
 
-### Priorité 2 — CLI memory (si Memory Layer stable)
+Après stabilisation du read CLI :
 
-Seulement après validation du Memory Layer :
+- Wirer `aeos security check --memory-dir` → écrire des MemoryRecord pour le rail Security
+- Wirer `aeos supabase check --memory-dir` → écrire des MemoryRecord pour le rail Supabase
 
-- Ajouter `aeos memory list` — lister les enregistrements
-- Ajouter `aeos memory search` — rechercher dans la mémoire
-- Ajouter `aeos memory export` — exporter la mémoire locale
+### Priorité 3 — Compare / Diff
 
-### Priorité 3 — Documentation Memory Layer
+- Comparer deux records successifs pour un même projet
+- `aeos memory diff --memory-dir <dir> --record-a <id> --record-b <id>`
 
-- Compléter `docs/features/AEOS-MEMORY-LAYER.md` si incomplet
-- Ajouter des exemples d'usage dans le sprint log
+### Priorité 4 — Validation humaine
+
+- Permettre à l'humain de marquer un record comme validé
+- `aeos memory validate --memory-dir <dir> --record <id>`
+- `aeos memory note --memory-dir <dir> --record <id> --text "note"`
 
 ---
 
@@ -119,26 +113,22 @@ Then:
 ## 6. Prochaine séquence recommandée
 
 ```bash
-# 1. Inspecter le commit Memory Layer
-cd ~/Development/AEOS
-git show 7139b77 --stat
+# 1. Merger sprint3g
+gh pr merge <pr_number> --squash
 
-# 2. Lire la spec Memory Layer
-# docs/features/AEOS-MEMORY-LAYER.md
+# 2. Vérifier le CLI après merge
+uv run aeos memory list --help
+uv run aeos memory show --help
 
-# 3. Valider les tests
-source .venv/bin/activate
-pytest tests/unit/test_memory_store.py -v
+# 3. Tester sur un vrai audit
+uv run aeos reclaim harden --path ~/aeos-client-audits/ma-mairie-digitale \
+  --memory-dir /tmp/aeos-memory-test
+uv run aeos memory list --memory-dir /tmp/aeos-memory-test
+uv run aeos memory show --memory-dir /tmp/aeos-memory-test \
+  --record <record_id_from_list>
 
-# 4. Vérifier la qualité
-ruff check src/aeos/memory/
-mypy src/aeos/memory/
-
-# 5. Vérifier l'intégration CLI
-uv run aeos memory --help
-
-# 6. Décider du prochain sprint avec le CTO
-# → consolidation, correction, ou extension CLI memory
+# 4. Décider du prochain sprint avec le CTO
+# → memory diff, ou rails supplémentaires, ou validation humaine
 ```
 
 ---
@@ -148,3 +138,4 @@ uv run aeos memory --help
 | Date | Mise à jour |
 |---|---|
 | 2026-06-29 | Création initiale — état post-sprint3f, memory layer mergé |
+| 2026-06-29 | Sprint 3G livré — Memory Read CLI (list + show), 28 tests |

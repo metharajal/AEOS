@@ -7,7 +7,28 @@ It contains only counts, status labels, and metadata — never secret values.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+
+@dataclass
+class MemoryRecordSummary:
+    """Lightweight view of a MemoryRecord for list display."""
+
+    record_id: str
+    project_name: str
+    created_at: str
+    command: str
+    status: str
+    generator: str | None
+    provider_count: int
+
+
+@dataclass
+class MemoryListResult:
+    """Result of list_records() — records found plus paths that could not be parsed."""
+
+    records: list[MemoryRecordSummary] = field(default_factory=list)
+    skipped_files: list[str] = field(default_factory=list)
 
 
 @dataclass

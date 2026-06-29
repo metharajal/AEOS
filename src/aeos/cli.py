@@ -33,6 +33,7 @@ security_app = typer.Typer(help="Security audit commands.")
 supabase_app = typer.Typer(help="Supabase integration audit and remediation.")
 supabase_rls_app = typer.Typer(help="Supabase RLS policy inspection.")
 reclaim_app = typer.Typer(help="Project reclaim and sovereignty analysis.")
+memory_app = typer.Typer(help="Memory Layer — read and inspect local audit records.")
 app.add_typer(project_app, name="project")
 app.add_typer(ai_app, name="ai")
 app.add_typer(sovereignty_app, name="sovereignty")
@@ -40,6 +41,7 @@ app.add_typer(security_app, name="security")
 app.add_typer(supabase_app, name="supabase")
 supabase_app.add_typer(supabase_rls_app, name="rls")
 app.add_typer(reclaim_app, name="reclaim")
+app.add_typer(memory_app, name="memory")
 
 REQUIRED_TOOLS = ["python", "uv", "git", "docker", "node", "pnpm", "gh", "code"]
 
@@ -2041,3 +2043,168 @@ def reclaim_inspect(
 
     if result.status == "ERROR":
         raise typer.Exit(code=1)
+
+
+# ---------------------------------------------------------------------------
+# memory list
+# ---------------------------------------------------------------------------
+
+
+@memory_app.command("list")
+def memory_list(
+    memory_dir: str = typer.Option(
+        ..., "--memory-dir", help="Directory containing local memory records."
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """List all memory records stored in a local memory directory (read-only)."""
+    from aeos.memory.store import list_records
+
+    mem_path = Path(memory_dir)
+    try:
+        result = list_records(mem_path)
+    except FileNotFoundError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+
+    if as_json:
+        payload: dict[str, object] = {
+            "memory_dir": str(mem_path),
+            "total": len(result.records),
+            "records": [
+                {
+                    "record_id": r.record_id,
+                    "project_name": r.project_name,
+                    "created_at": r.created_at,
+                    "source_command": r.command,
+                    "status": r.status,
+                    "generator_detected": r.generator,
+                    "provider_count": r.provider_count,
+                }
+                for r in result.records
+            ],
+            "skipped_files": result.skipped_files,
+        }
+        typer.echo(json.dumps(payload, indent=2))
+        return
+
+    typer.echo(f"Memory Records — {mem_path}")
+    typer.echo(f"Records found: {len(result.records)}")
+
+    if result.skipped_files:
+        for skipped in result.skipped_files:
+            typer.echo(f"  Warning: skipped invalid JSON — {skipped}", err=True)
+
+    if not result.records:
+        typer.echo("")
+        typer.echo("No records found.")
+        typer.echo("Run 'aeos reclaim harden --memory-dir <dir>' to create one.")
+        return
+
+    typer.echo("")
+    for rec in result.records:
+        typer.echo(f"  record_id:      {rec.record_id}")
+        typer.echo(f"  project_name:   {rec.project_name}")
+        typer.echo(f"  created_at:     {rec.created_at}")
+        typer.echo(f"  source_command: {rec.command}")
+        typer.echo(f"  status:         {rec.status}")
+        if rec.generator is not None:
+            typer.echo(f"  generator:      {rec.generator}")
+        typer.echo(f"  providers:      {rec.provider_count}")
+        typer.echo("")
+
+    typer.echo("Read-only — no files modified.")
+
+
+# ---------------------------------------------------------------------------
+# memory show
+# ---------------------------------------------------------------------------
+
+
+@memory_app.command("show")
+def memory_show(
+    memory_dir: str = typer.Option(
+        ..., "--memory-dir", help="Directory containing local memory records."
+    ),
+    record_id: str = typer.Option(
+        ..., "--record", help="ID of the memory record to display."
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Show a single memory record in detail (read-only)."""
+    from aeos.memory.store import load_record
+
+    mem_path = Path(memory_dir)
+    try:
+        record = load_record(mem_path, record_id)
+    except FileNotFoundError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+
+    if as_json:
+        payload = {
+            "record_id": record.record_id,
+            "project_name": record.project_name,
+            "project_path": record.project_path,
+            "created_at": record.created_at,
+            "rail": record.rail,
+            "source_command": record.command,
+            "status": record.status,
+            "generator_detected": record.generator,
+            "providers": record.providers,
+            "control_level": record.control_level,
+            "read_only": record.read_only,
+            "applied": record.applied,
+            "findings_summary": record.findings_summary,
+            "remediation_summary": record.remediation_summary,
+            "strategic_options": record.strategic_options,
+            "human_validated": record.human_validated,
+            "notes": record.notes,
+        }
+        typer.echo(json.dumps(payload, indent=2))
+        return
+
+    typer.echo(f"Memory Record — {record.record_id}")
+    typer.echo("")
+    typer.echo(f"  project_name:   {record.project_name}")
+    typer.echo(f"  project_path:   {record.project_path}")
+    typer.echo(f"  created_at:     {record.created_at}")
+    typer.echo(f"  source_command: {record.command}")
+    typer.echo(f"  status:         {record.status}")
+    typer.echo(f"  read_only:      {record.read_only}")
+    typer.echo(f"  applied:        {record.applied}")
+    typer.echo(f"  human_validated:{record.human_validated}")
+
+    if record.generator:
+        typer.echo(f"  generator:      {record.generator}")
+    if record.providers:
+        typer.echo(f"  providers:      {', '.join(record.providers)}")
+    typer.echo(f"  control_level:  {record.control_level}")
+
+    if record.findings_summary:
+        typer.echo("")
+        typer.echo("── Findings Summary ─────────────────────────────────────")
+        for key, count in record.findings_summary.items():
+            typer.echo(f"  {key:<12} {count}")
+
+    if record.remediation_summary:
+        typer.echo("")
+        typer.echo("── Remediation Summary ──────────────────────────────────")
+        for key, count in record.remediation_summary.items():
+            typer.echo(f"  {key:<20} {count}")
+
+    if record.strategic_options:
+        typer.echo("")
+        typer.echo("── Strategic Options ────────────────────────────────────")
+        for opt in record.strategic_options:
+            typer.echo(f"  {opt}")
+
+    if record.notes:
+        typer.echo("")
+        typer.echo(f"  notes: {record.notes}")
+
+    typer.echo("")
+    typer.echo("Read-only — no files modified.")

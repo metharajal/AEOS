@@ -228,27 +228,148 @@ record_path = save_record(record, Path("/tmp/aeos-memory"))
 
 ---
 
-## 9. Current Limits
+## 9. Memory Read CLI
 
-| Limit | Detail |
-|---|---|
-| Single-command coverage | Only `reclaim harden` builds memory records in this MVP. Other rails (security, supabase) are not yet wired. |
-| No memory read command | There is no `aeos memory list` or `aeos memory show` yet. Records are plain JSON — read them with any JSON viewer. |
-| No memory search | Records must be browsed manually. Full-text or field-based search is planned. |
-| No deduplication | Each run creates a new file. Old records are not pruned automatically. |
-| No diff | No comparison between successive records for the same project. |
+Introduced in **Sprint 3G**. Two read-only commands for browsing local memory records.
+
+### `aeos memory list`
+
+Lists all records in a local memory directory.
+
+```bash
+aeos memory list --memory-dir /tmp/aeos-memory
+aeos memory list --memory-dir /tmp/aeos-memory --json
+```
+
+**Text output example:**
+
+```
+Memory Records — /tmp/aeos-memory
+Records found: 1
+
+  record_id:      ma-mairie-digitale-20260629T115627-e94541fc
+  project_name:   ma-mairie-digitale
+  created_at:     2026-06-29T11:56:27.260150+00:00
+  source_command: reclaim harden
+  status:         ERROR
+  generator:      lovable
+  providers:      1
+
+Read-only — no files modified.
+```
+
+**JSON output example:**
+
+```json
+{
+  "memory_dir": "/tmp/aeos-memory",
+  "total": 1,
+  "records": [
+    {
+      "record_id": "ma-mairie-digitale-20260629T115627-e94541fc",
+      "project_name": "ma-mairie-digitale",
+      "created_at": "2026-06-29T11:56:27.260150+00:00",
+      "source_command": "reclaim harden",
+      "status": "ERROR",
+      "generator_detected": "lovable",
+      "provider_count": 1
+    }
+  ],
+  "skipped_files": []
+}
+```
+
+**Behaviour:**
+- If `--memory-dir` does not exist → clear error message + exit code 1.
+- If directory is empty or has no records → `No records found.` + exit code 0.
+- If a JSON file is invalid → warning displayed, file skipped, other records listed normally.
+- Never reads `.env`. Never modifies any file.
 
 ---
 
-## 10. Next Steps
+### `aeos memory show`
+
+Shows a single record in detail.
+
+```bash
+aeos memory show --memory-dir /tmp/aeos-memory --record ma-mairie-digitale-20260629T115627-e94541fc
+aeos memory show --memory-dir /tmp/aeos-memory --record ma-mairie-digitale-20260629T115627-e94541fc --json
+```
+
+**Text output example:**
+
+```
+Memory Record — ma-mairie-digitale-20260629T115627-e94541fc
+
+  project_name:   ma-mairie-digitale
+  project_path:   /Users/.../ma-mairie-digitale
+  created_at:     2026-06-29T11:56:27.260150+00:00
+  source_command: reclaim harden
+  status:         ERROR
+  read_only:      True
+  applied:        False
+  human_validated:False
+  generator:      lovable
+  providers:      supabase
+  control_level:  weak
+
+── Findings Summary ─────────────────────────────────────
+  critical     3
+  important    72
+  manual       15
+  generated    25
+
+── Remediation Summary ──────────────────────────────────
+  phases_count         5
+  immediate            3
+  manual               8
+  generatable          25
+  strategic            5
+
+── Strategic Options ────────────────────────────────────
+  1. [low/partial] Stay on current provider but secure
+  2. [medium/medium] Migrate to own Supabase Cloud project
+  ...
+
+Read-only — no files modified.
+```
+
+**JSON output** includes all fields: `record_id`, `project_name`, `project_path`,
+`created_at`, `rail`, `source_command`, `status`, `generator_detected`, `providers`,
+`control_level`, `read_only`, `applied`, `findings_summary`, `remediation_summary`,
+`strategic_options`, `human_validated`, `notes`.
+
+**Behaviour:**
+- If `--memory-dir` does not exist → clear error + exit code 1.
+- If `--record` not found → clear error + exit code 1.
+- If JSON is invalid → clear error + exit code 1 (does not skip unlike `list`).
+- Never reads `.env`. Never modifies any file.
+
+---
+
+## 10. Current Limits
+
+| Limit | Detail |
+|---|---|
+| Single-command coverage | Only `reclaim harden` builds memory records. Other rails (security, supabase) are not yet wired. |
+| No memory search | Records must be browsed by record_id. Full-text or field-based search is planned. |
+| No deduplication | Each run creates a new file. Old records are not pruned automatically. |
+| No diff | No comparison between successive records for the same project. |
+| No compare/search/learn | Planned for a future sprint after foundational read CLI is stable. |
+
+---
+
+## 11. Next Steps
 
 | Item | Status |
 |---|---|
 | Memory MVP — `reclaim harden` | **Done — Sprint 3F** |
-| Memory read CLI (`aeos memory list`, `aeos memory show`) | Planned |
+| Memory read CLI (`aeos memory list`, `aeos memory show`) | **Done — Sprint 3G** |
 | Memory for other rails (security, supabase) | Planned |
 | Record diff — compare successive audits | Planned |
 | Human validation workflow (`human_validated: true`, `notes`) | Planned |
+| Memory search (`aeos memory search`) | Planned — after compare/diff |
+| Memory learn — pattern extraction from history | Future |
 
 ---
 
