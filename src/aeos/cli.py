@@ -2117,6 +2117,128 @@ def memory_list(
 
 
 # ---------------------------------------------------------------------------
+# memory compare
+# ---------------------------------------------------------------------------
+
+
+@memory_app.command("compare")
+def memory_compare(
+    memory_dir: str = typer.Option(
+        ..., "--memory-dir", help="Directory containing local memory records."
+    ),
+    left: str = typer.Option(
+        ..., "--left", help="Left record: record_id or path to a JSON file."
+    ),
+    right: str = typer.Option(
+        ..., "--right", help="Right record: record_id or path to a JSON file."
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Compare two memory records and show what improved, degraded, or changed."""
+    from aeos.memory.compare import (
+        MemoryCompareDelta,
+        compare_records,
+        load_record_reference,
+    )
+
+    mem_path = Path(memory_dir)
+
+    try:
+        left_record = load_record_reference(mem_path, left)
+    except FileNotFoundError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+
+    try:
+        right_record = load_record_reference(mem_path, right)
+    except FileNotFoundError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+
+    result = compare_records(left_record, right_record)
+
+    if as_json:
+
+        def _delta_dict(d: MemoryCompareDelta) -> dict[str, object]:
+            return {
+                "field": d.field,
+                "left": d.left_value,
+                "right": d.right_value,
+                "trend": d.trend,
+            }
+
+        payload: dict[str, object] = {
+            "left_id": result.left_id,
+            "right_id": result.right_id,
+            "project_name": result.project_name,
+            "compatible": result.compatible,
+            "synthesis": result.synthesis,
+            "improved": [_delta_dict(d) for d in result.improved],
+            "degraded": [_delta_dict(d) for d in result.degraded],
+            "unchanged": [_delta_dict(d) for d in result.unchanged],
+            "incompatible_fields": [_delta_dict(d) for d in result.incompatible_fields],
+        }
+        typer.echo(json.dumps(payload, indent=2))
+        return
+
+    typer.echo("Memory Compare")
+    typer.echo(f"Left:      {result.left_id}")
+    typer.echo(f"Right:     {result.right_id}")
+    typer.echo(f"Project:   {result.project_name}")
+    typer.echo(f"Synthesis: {result.synthesis}")
+
+    if not result.compatible:
+        typer.echo("")
+        typer.echo(
+            "Incompatible records — project names differ."
+            " Compare records from the same project."
+        )
+        typer.echo("")
+        typer.echo("Read-only — no files modified.")
+        return
+
+    def _fmt(d: MemoryCompareDelta) -> str:
+        if d.left_value == d.right_value:
+            return f"  {d.field:<16} {d.left_value} (unchanged)"
+        return f"  {d.field:<16} {d.left_value} → {d.right_value}"
+
+    if result.improved:
+        typer.echo("")
+        typer.echo(f"── Improved ({len(result.improved)}) " + "─" * 40)
+        for d in result.improved:
+            typer.echo(_fmt(d))
+
+    if result.degraded:
+        typer.echo("")
+        typer.echo(f"── Degraded ({len(result.degraded)}) " + "─" * 40)
+        for d in result.degraded:
+            typer.echo(_fmt(d))
+
+    if result.unchanged:
+        typer.echo("")
+        typer.echo(f"── Unchanged ({len(result.unchanged)}) " + "─" * 39)
+        for d in result.unchanged:
+            typer.echo(_fmt(d))
+
+    if result.incompatible_fields:
+        typer.echo("")
+        typer.echo(
+            f"── Incompatible fields ({len(result.incompatible_fields)}) " + "─" * 30
+        )
+        for d in result.incompatible_fields:
+            typer.echo(f"  {d.field:<16} {d.left_value} / {d.right_value}")
+
+    typer.echo("")
+    typer.echo("Read-only — no files modified.")
+
+
+# ---------------------------------------------------------------------------
 # memory show
 # ---------------------------------------------------------------------------
 
