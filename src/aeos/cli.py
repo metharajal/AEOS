@@ -2330,3 +2330,102 @@ def memory_show(
 
     typer.echo("")
     typer.echo("Read-only — no files modified.")
+
+
+# ---------------------------------------------------------------------------
+# memory timeline
+# ---------------------------------------------------------------------------
+
+_TREND_ICON: dict[str, str] = {
+    "improved": "↑",
+    "degraded": "↓",
+    "unchanged": "→",
+    "insufficient_data": "?",
+    "mixed": "~",
+}
+
+
+@memory_app.command("timeline")
+def memory_timeline(
+    memory_dir: str = typer.Option(
+        ..., "--memory-dir", help="Directory containing local memory records."
+    ),
+    project: str = typer.Option(
+        ..., "--project", help="Project name to build the timeline for."
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Show the chronological timeline of memory records for a project (read-only)."""
+    from aeos.memory.timeline import (
+        build_timeline,
+        load_project_records,
+        timeline_to_dict,
+    )
+
+    mem_path = Path(memory_dir)
+
+    try:
+        records = load_project_records(mem_path, project)
+    except FileNotFoundError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+
+    if not records:
+        typer.echo(
+            f"Error: no records found for project '{project}' in {mem_path}",
+            err=True,
+        )
+        raise typer.Exit(code=1) from None
+
+    result = build_timeline(records)
+    result.memory_dir = str(mem_path)
+
+    if as_json:
+        typer.echo(json.dumps(timeline_to_dict(result), indent=2))
+        return
+
+    typer.echo(f"Memory Timeline — {result.project_name}")
+    typer.echo(f"Directory: {mem_path}")
+    typer.echo(f"Records:   {len(result.entries)}")
+    typer.echo("")
+    typer.echo(
+        f"{'#':<3}  {'date':<26}  {'status':<9}  "
+        f"{'ctrl':<12}  {'crit':>4}  {'imp':>5}  {'man':>4}  {'gen':>4}"
+    )
+    typer.echo("─" * 80)
+    for i, entry in enumerate(result.entries, start=1):
+        date_str = entry.created_at[:19].replace("T", " ")
+        typer.echo(
+            f"{i:<3}  {date_str:<26}  {entry.status:<9}  "
+            f"{entry.control_level:<12}  {entry.critical:>4}  "
+            f"{entry.important:>5}  {entry.manual:>4}  {entry.generated:>4}"
+        )
+        typer.echo(f"     {entry.record_id}")
+
+    if result.synthesis:
+        syn = result.synthesis
+        typer.echo("")
+        typer.echo("── Synthesis ────────────────────────────────────────────")
+        typer.echo(
+            f"  Status:    {syn.first_status} → {syn.last_status}"
+            f"  {_TREND_ICON.get(syn.overall, syn.overall)}"
+        )
+        typer.echo(f"  Overall:   {syn.overall}")
+        typer.echo(
+            f"  Critical:  {_TREND_ICON.get(syn.critical_trend, '')} "
+            f"{syn.critical_trend}"
+        )
+        typer.echo(
+            f"  Important: {_TREND_ICON.get(syn.important_trend, '')} "
+            f"{syn.important_trend}"
+        )
+        typer.echo(
+            f"  Manual:    {_TREND_ICON.get(syn.manual_trend, '')} {syn.manual_trend}"
+        )
+        typer.echo(
+            f"  Generated: {_TREND_ICON.get(syn.generated_trend, '')} "
+            f"{syn.generated_trend}"
+        )
+
+    typer.echo("")
+    typer.echo("Read-only — no files modified.")

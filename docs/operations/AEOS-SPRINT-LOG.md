@@ -383,6 +383,37 @@ Comportement attendu : deux audits consécutifs du même projet non modifié.
 **Livraisons :**
 - `docs/features/AEOS-MEMORY-LAYER.md` — Section 11 : Real-World Validation Scenario
 
-**PR / Commit :** Sprint 3H-1 — branch `sprint3h1/memory-compare-real-validation`
+**PR / Commit :** PR #39 — mergé dans main (`f7ed7e9`)
 **Statut :** DONE
 **Validation :** Chaîne complète exécutée, résultat `unchanged` confirmé, repos propres.
+
+---
+
+## Sprint 3I — Memory Timeline MVP
+
+**Objectif :** Ajouter `aeos memory timeline --memory-dir <dir> --project <name>` pour
+afficher la timeline chronologique de tous les MemoryRecords d'un projet.
+
+**Livraisons :**
+
+- `src/aeos/memory/timeline.py` — `MemoryTimelineEntry`, `MemoryTimelineResult`,
+  `MemoryTimelineSynthesis`, `load_project_records()`, `build_timeline()`,
+  `compute_timeline_synthesis()`, `timeline_to_dict()`
+- `src/aeos/memory/__init__.py` — exports mis à jour
+- `src/aeos/cli.py` — sous-commande `memory timeline`
+- `tests/unit/test_memory_timeline.py` — 22 tests unitaires
+- `docs/features/AEOS-MEMORY-LAYER.md` — Section 11 Memory Timeline ajoutée
+
+**Commandes ajoutées :**
+
+```bash
+aeos memory timeline --memory-dir <dir> --project <project_name>
+aeos memory timeline --memory-dir <dir> --project <project_name> --json
+```
+
+Synthesis : `improved` | `degraded` | `unchanged` | `insufficient_data`.
+Colonnes affichées : date, record_id, status, control_level, critical, important, manual, generated.
+
+**PR / Commit :** Sprint 3I — branch `sprint3i/memory-timeline-mvp`
+**Statut :** DONE — 1364 tests passés
+**Validation :** `uv run pytest` → 1364 passed. `aeos memory timeline` fonctionnel.
