@@ -295,9 +295,7 @@ class BuildPlan:
 def validate_project_type(project_type: str) -> None:
     if project_type not in VALID_TYPES:
         valid = ", ".join(sorted(VALID_TYPES))
-        raise ValueError(
-            f"Unknown project type '{project_type}'. Valid: {valid}."
-        )
+        raise ValueError(f"Unknown project type '{project_type}'. Valid: {valid}.")
 
 
 def validate_stack(stack: str) -> None:
