@@ -673,7 +673,125 @@ Read-only — no files modified.
 
 ---
 
-## 11. Current Limits
+## 11. Real-World Validation Scenario (Sprint 3H-1)
+
+This scenario was executed against `ma-mairie-digitale` on 2026-06-29 to confirm the
+full Memory chain works on a real project without touching the client.
+
+### Prerequisites
+
+- `memory_dir` must be **outside** the audited project (e.g. `/tmp/aeos-memory-compare-validation`)
+- Client project is opened **read-only** — no write, no `.env`, no DB connection
+
+### Step-by-step
+
+**1. Create two MemoryRecords (two consecutive audits of the same project):**
+
+```bash
+uv run aeos reclaim harden \
+  --path ~/aeos-client-audits/ma-mairie-digitale \
+  --memory-dir /tmp/aeos-memory-compare-validation
+
+uv run aeos reclaim harden \
+  --path ~/aeos-client-audits/ma-mairie-digitale \
+  --memory-dir /tmp/aeos-memory-compare-validation
+```
+
+Each run prints a `Memory: <path>` line — copy the record IDs from there (or from `memory list`).
+
+**2. List the records:**
+
+```bash
+uv run aeos memory list --memory-dir /tmp/aeos-memory-compare-validation
+```
+
+```
+Memory Records — /tmp/aeos-memory-compare-validation
+Records found: 2
+
+  record_id:      ma-mairie-digitale-20260629T214040-087abc8d
+  project_name:   ma-mairie-digitale
+  created_at:     2026-06-29T21:40:40.905035+00:00
+  source_command: reclaim harden
+  status:         ERROR
+  generator:      lovable
+  providers:      1
+
+  record_id:      ma-mairie-digitale-20260629T214048-da25f672
+  ...
+```
+
+**3. Show a record in detail:**
+
+```bash
+uv run aeos memory show \
+  --memory-dir /tmp/aeos-memory-compare-validation \
+  --record ma-mairie-digitale-20260629T214040-087abc8d
+```
+
+**4. Compare the two records:**
+
+```bash
+uv run aeos memory compare \
+  --memory-dir /tmp/aeos-memory-compare-validation \
+  --left  ma-mairie-digitale-20260629T214040-087abc8d \
+  --right ma-mairie-digitale-20260629T214048-da25f672
+```
+
+```
+Memory Compare
+Left:      ma-mairie-digitale-20260629T214040-087abc8d
+Right:     ma-mairie-digitale-20260629T214048-da25f672
+Project:   ma-mairie-digitale
+Synthesis: unchanged
+
+── Unchanged (7) ───────────────────────────────────────
+  status           ERROR (unchanged)
+  control_level    weak (unchanged)
+  critical         3 (unchanged)
+  important        72 (unchanged)
+  manual           15 (unchanged)
+  generated        25 (unchanged)
+  phases_count     5 (unchanged)
+
+Read-only — no files modified.
+```
+
+**5. Compare as JSON:**
+
+```bash
+uv run aeos memory compare \
+  --memory-dir /tmp/aeos-memory-compare-validation \
+  --left  ma-mairie-digitale-20260629T214040-087abc8d \
+  --right ma-mairie-digitale-20260629T214048-da25f672 \
+  --json
+```
+
+### What this validates
+
+| Check | Observed |
+|---|---|
+| Two audits of the same unmodified project | Synthesis `unchanged` — correct |
+| All 7 tracked fields identical between runs | Confirmed |
+| Client project untouched | `git status` clean after all commands |
+| Memory files in `/tmp`, not in client project | Confirmed |
+| No database connection | No SQL, no Supabase credentials read |
+| No `.env` read | Confirmed |
+| Read-only invariant | No files written in AEOS repo or client project |
+
+### Reading the synthesis
+
+Two consecutive audits of an **unchanged** project must always produce `synthesis: unchanged`.
+Any deviation (e.g. `improved` or `degraded`) would indicate non-determinism in the audit
+engine — a signal to investigate.
+
+When a real remediation has been applied between two audits, `synthesis` will reflect the
+actual change: `improved` if findings decreased, `degraded` if they increased, `mixed` if
+some went up and others went down.
+
+---
+
+## 12. Current Limits
 
 | Limit | Detail |
 |---|---|

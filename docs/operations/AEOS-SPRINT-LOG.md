@@ -336,6 +336,53 @@ aeos memory compare --memory-dir <dir> --left <id> --right <id> --json
 Synthesis categories : `improved` | `degraded` | `unchanged` | `mixed` | `incompatible`.
 `--left` / `--right` acceptent un record_id ou un chemin JSON direct.
 
-**PR / Commit :** Sprint 3H — branch `sprint3h/memory-compare`
+**PR / Commit :** PR #38 — mergé dans main (`401d485`)
 **Statut :** DONE — 1342 tests passés
 **Validation :** `uv run pytest` → 1342 passed. `aeos memory compare` fonctionnel.
+
+---
+
+## Sprint 3H-1 — Memory Compare Real-World Validation
+
+**Objectif :** Valider en conditions réelles la chaîne Memory complète sur `ma-mairie-digitale`
+sans modifier le projet client.
+
+**Projet utilisé :** `~/aeos-client-audits/ma-mairie-digitale` — ouvert en lecture seule uniquement.
+
+**Dossier mémoire temporaire :** `/tmp/aeos-memory-compare-validation` — hors du projet client.
+
+**Séquence exécutée :**
+
+1. `aeos reclaim harden --memory-dir /tmp/aeos-memory-compare-validation` → record #1
+2. `aeos reclaim harden --memory-dir /tmp/aeos-memory-compare-validation` → record #2
+3. `aeos memory list --memory-dir /tmp/aeos-memory-compare-validation` → 2 records listés
+4. `aeos memory show --record ma-mairie-digitale-20260629T214040-087abc8d` → OK
+5. `aeos memory show --record ma-mairie-digitale-20260629T214048-da25f672` → OK
+6. `aeos memory compare --left <id1> --right <id2>` → `Synthesis: unchanged` (7 champs)
+7. `aeos memory compare --left <id1> --right <id2> --json` → JSON valide
+
+**Records comparés :**
+
+| Rôle | Record ID |
+|---|---|
+| Left (1er audit) | `ma-mairie-digitale-20260629T214040-087abc8d` |
+| Right (2ème audit) | `ma-mairie-digitale-20260629T214048-da25f672` |
+
+**Résultat compare :** `synthesis: unchanged` — tous les 7 champs identiques.
+Comportement attendu : deux audits consécutifs du même projet non modifié.
+
+**Garanties confirmées :**
+- `ma-mairie-digitale` : `git status` clean avant et après — aucune modification
+- Aucune connexion base de données
+- Aucune migration lancée
+- Aucun `.env` lu
+- Aucun secret affiché
+- Fichiers mémoire dans `/tmp` uniquement, hors du projet client
+- `read_only: true` · `applied: false` dans les deux records
+
+**Livraisons :**
+- `docs/features/AEOS-MEMORY-LAYER.md` — Section 11 : Real-World Validation Scenario
+
+**PR / Commit :** Sprint 3H-1 — branch `sprint3h1/memory-compare-real-validation`
+**Statut :** DONE
+**Validation :** Chaîne complète exécutée, résultat `unchanged` confirmé, repos propres.
