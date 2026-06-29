@@ -1621,6 +1621,37 @@ def _reclaim_harden_json(
         "rls": rls_data,
         "recommendations": result.recommendations,
         "exit_options": result.exit_options,
+        "remediation_plan": _remediation_plan_json(result),
+    }
+
+
+def _remediation_plan_json(result: object) -> dict[str, object] | None:
+    """Serialize remediation_plan for JSON output. Returns None if not present."""
+    from aeos.reclaim.hardener import ReclaimHardenResult
+
+    assert isinstance(result, ReclaimHardenResult)  # noqa: S101
+    plan = result.remediation_plan
+    if plan is None:
+        return None
+    return {
+        "phases_count": plan.phases_count,
+        "immediate_actions_count": plan.immediate_actions_count,
+        "manual_actions_count": plan.manual_actions_count,
+        "generatable_actions_count": plan.generatable_actions_count,
+        "strategic_options_count": plan.strategic_options_count,
+        "phases": [
+            {
+                "id": ph.id,
+                "label": ph.label,
+                "priority": ph.priority,
+                "goal": ph.goal,
+                "actions": ph.actions,
+                "automation_level": ph.automation_level,
+                "expected_outcome": ph.expected_outcome,
+                "risk_if_skipped": ph.risk_if_skipped,
+            }
+            for ph in plan.phases
+        ],
     }
 
 
@@ -1795,6 +1826,23 @@ def reclaim_harden(
     for opt in result.exit_options:
         typer.echo(f"  {opt}")
     typer.echo("")
+
+    if result.remediation_plan is not None:
+        plan = result.remediation_plan
+        typer.echo("── Remediation Plan " + "─" * 40)
+        typer.echo(
+            f"  {plan.phases_count} phases · "
+            f"{plan.immediate_actions_count} immediate · "
+            f"{plan.manual_actions_count} manual · "
+            f"{plan.generatable_actions_count} generatable · "
+            f"{plan.strategic_options_count} strategic paths"
+        )
+        _PRIO_ICON = {"critical": "✗", "high": "⚠", "medium": "·", "low": "·"}
+        for ph in plan.phases:
+            icon = _PRIO_ICON.get(ph.priority, "·")
+            typer.echo(f"  {icon} [{ph.priority:<8}] {ph.id} — {ph.label}")
+        typer.echo("  → Run with --output to export the full plan.")
+        typer.echo("")
 
     typer.echo(
         "Read-only — no files modified, no migration applied, no database connection."

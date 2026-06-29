@@ -16,8 +16,11 @@ from aeos.cli import app
 from aeos.reclaim.hardener import (
     ReclaimHardenResult,
     ReclaimHardenSummary,
+    RemediationPhase,
+    RemediationPlan,
     _build_exit_options,
     _build_recommendations,
+    _build_remediation_plan,
     _compute_status,
     _control_level,
     _count_findings,
@@ -688,6 +691,319 @@ class TestRunReclaimHarden:
             result = run_reclaim_harden(tmp_path)
         assert result.summary.generated_actions == 25
         assert result.summary.manual_actions >= 13
+
+
+# ---------------------------------------------------------------------------
+# TestRemediationPlan
+# ---------------------------------------------------------------------------
+
+
+def _make_plan() -> RemediationPlan:
+    phase = RemediationPhase(
+        id="phase_0",
+        label="Immediate security stabilization",
+        priority="critical",
+        goal="Neutralize all active security risks.",
+        why_it_matters="Exposed credentials remain active until rotated.",
+        actions=["Rotate exposed keys.", "Remove .env from Git."],
+        automation_level="manual",
+        expected_outcome="No exposed credentials.",
+        risk_if_skipped="Breach window remains open.",
+    )
+    return RemediationPlan(
+        phases=[phase],
+        phases_count=1,
+        immediate_actions_count=2,
+        manual_actions_count=2,
+        generatable_actions_count=25,
+        strategic_options_count=5,
+    )
+
+
+class TestRemediationPlan:
+    def test_dataclass_fields(self) -> None:
+        plan = _make_plan()
+        assert plan.phases_count == 1
+        assert plan.immediate_actions_count == 2
+        assert plan.generatable_actions_count == 25
+        assert plan.strategic_options_count == 5
+
+    def test_phase_fields(self) -> None:
+        plan = _make_plan()
+        phase = plan.phases[0]
+        assert phase.id == "phase_0"
+        assert phase.priority == "critical"
+        assert phase.automation_level == "manual"
+        assert len(phase.actions) == 2
+
+    def test_build_remediation_plan_returns_five_phases(self) -> None:
+        reclaim = _make_reclaim(secrets_exposure="confirmed")
+        security = _make_security(error=True)
+        summary = ReclaimHardenSummary(
+            generator_detected="lovable",
+            providers_detected=["supabase"],
+            control_level="weak",
+            secrets_exposure="confirmed",
+            security_status="ERROR",
+            sovereignty_status="WARNING",
+            supabase_status="ERROR",
+            rls_verdict="WARNING",
+            generated_actions=25,
+            manual_actions=13,
+            critical_findings=1,
+            important_findings=2,
+        )
+        plan = _build_remediation_plan(
+            summary, reclaim, security, _make_rls_mock(), Path("/fake")
+        )
+        assert plan.phases_count == 5
+        assert len(plan.phases) == 5
+
+    def test_phase_ids_sequential(self) -> None:
+        reclaim = _make_reclaim()
+        security = _make_security(status="OK")
+        summary = ReclaimHardenSummary(
+            generator_detected="lovable",
+            providers_detected=["supabase"],
+            control_level="partial",
+            secrets_exposure="none",
+            security_status="OK",
+            sovereignty_status="WARNING",
+            supabase_status="WARNING",
+            rls_verdict="WARNING",
+            generated_actions=0,
+            manual_actions=0,
+            critical_findings=0,
+            important_findings=1,
+        )
+        plan = _build_remediation_plan(summary, reclaim, security, None, Path("/fake"))
+        ids = [ph.id for ph in plan.phases]
+        assert ids == ["phase_0", "phase_1", "phase_2", "phase_3", "phase_4"]
+
+    def test_phase_0_critical_on_secrets_exposed(self) -> None:
+        reclaim = _make_reclaim(secrets_exposure="confirmed")
+        security = _make_security(status="OK")
+        summary = ReclaimHardenSummary(
+            generator_detected=None,
+            providers_detected=[],
+            control_level="weak",
+            secrets_exposure="confirmed",
+            security_status="OK",
+            sovereignty_status="OK",
+            supabase_status=None,
+            rls_verdict=None,
+            generated_actions=0,
+            manual_actions=0,
+            critical_findings=0,
+            important_findings=0,
+        )
+        plan = _build_remediation_plan(summary, reclaim, security, None, Path("/fake"))
+        assert plan.phases[0].priority == "critical"
+        assert any("Rotate" in a for a in plan.phases[0].actions)
+
+    def test_phase_1_generatable_when_rls_auto_blocks(self) -> None:
+        reclaim = _make_reclaim()
+        security = _make_security(status="OK")
+        rls = _make_rls_mock(verdict="WARNING")
+        summary = ReclaimHardenSummary(
+            generator_detected="lovable",
+            providers_detected=["supabase"],
+            control_level="partial",
+            secrets_exposure="none",
+            security_status="OK",
+            sovereignty_status="WARNING",
+            supabase_status="WARNING",
+            rls_verdict="WARNING",
+            generated_actions=25,
+            manual_actions=13,
+            critical_findings=0,
+            important_findings=2,
+        )
+        plan = _build_remediation_plan(summary, reclaim, security, rls, Path("/fake"))
+        assert plan.phases[1].automation_level == "generatable"
+        assert plan.generatable_actions_count == 25
+
+    def test_phase_2_high_on_generator_detected(self) -> None:
+        reclaim = _make_reclaim(generator="lovable")
+        security = _make_security(status="OK")
+        summary = ReclaimHardenSummary(
+            generator_detected="lovable",
+            providers_detected=["supabase"],
+            control_level="partial",
+            secrets_exposure="none",
+            security_status="OK",
+            sovereignty_status="WARNING",
+            supabase_status=None,
+            rls_verdict=None,
+            generated_actions=0,
+            manual_actions=0,
+            critical_findings=0,
+            important_findings=0,
+        )
+        plan = _build_remediation_plan(summary, reclaim, security, None, Path("/fake"))
+        assert plan.phases[2].priority == "high"
+
+    def test_phase_4_always_low(self) -> None:
+        reclaim = _make_reclaim()
+        security = _make_security(status="OK")
+        summary = ReclaimHardenSummary(
+            generator_detected=None,
+            providers_detected=[],
+            control_level="strong",
+            secrets_exposure="none",
+            security_status="OK",
+            sovereignty_status="OK",
+            supabase_status=None,
+            rls_verdict=None,
+            generated_actions=0,
+            manual_actions=0,
+            critical_findings=0,
+            important_findings=0,
+        )
+        plan = _build_remediation_plan(summary, reclaim, security, None, Path("/fake"))
+        assert plan.phases[4].priority == "low"
+        assert plan.phases[4].id == "phase_4"
+
+    def test_strategic_options_count(self) -> None:
+        reclaim = _make_reclaim()
+        security = _make_security(status="OK")
+        summary = ReclaimHardenSummary(
+            generator_detected="lovable",
+            providers_detected=["supabase"],
+            control_level="partial",
+            secrets_exposure="none",
+            security_status="OK",
+            sovereignty_status="WARNING",
+            supabase_status=None,
+            rls_verdict=None,
+            generated_actions=0,
+            manual_actions=0,
+            critical_findings=0,
+            important_findings=0,
+        )
+        plan = _build_remediation_plan(summary, reclaim, security, None, Path("/fake"))
+        assert plan.strategic_options_count == len(reclaim.exit_options)
+
+    def test_result_has_remediation_plan_after_run(self, tmp_path: Path) -> None:
+        reclaim = _make_reclaim(supabase_detected=False)
+        security = _make_security(status="OK")
+        sovereignty = _make_sovereignty(status="OK")
+        _p = "aeos.reclaim.hardener"
+        with (
+            patch(f"{_p}.run_reclaim_inspect", return_value=reclaim),
+            patch(f"{_p}.run_security_check", return_value=security),
+            patch(f"{_p}.run_sovereignty_check", return_value=sovereignty),
+        ):
+            result = run_reclaim_harden(tmp_path)
+        assert result.remediation_plan is not None
+        assert result.remediation_plan.phases_count == 5
+
+    def test_remediation_plan_in_markdown_report(self) -> None:
+        result = _make_harden_result()
+        result.remediation_plan = _make_plan()
+        report = build_harden_report(result)
+        assert "## Remediation Plan" in report
+        assert "Phase 0" in report
+        assert "Immediate security stabilization" in report
+
+    def test_markdown_report_has_all_five_phases(self, tmp_path: Path) -> None:
+        reclaim = _make_reclaim(supabase_detected=False)
+        security = _make_security(status="OK")
+        sovereignty = _make_sovereignty(status="OK")
+        _p = "aeos.reclaim.hardener"
+        with (
+            patch(f"{_p}.run_reclaim_inspect", return_value=reclaim),
+            patch(f"{_p}.run_security_check", return_value=security),
+            patch(f"{_p}.run_sovereignty_check", return_value=sovereignty),
+        ):
+            result = run_reclaim_harden(tmp_path)
+        report = build_harden_report(result)
+        for i in range(5):
+            label = f"Phase {i}"
+            slug = f"phase_{i}".replace("_", " ").title()
+            assert label in report or slug in report
+
+    def test_remediation_plan_in_json(self) -> None:
+        result = _make_harden_result()
+        result.remediation_plan = _make_plan()
+        with patch("aeos.cli.run_reclaim_harden", return_value=result):
+            r = runner.invoke(
+                app, ["reclaim", "harden", "--path", "/fake/project", "--json"]
+            )
+        data = json.loads(r.output)
+        assert "remediation_plan" in data
+        assert data["remediation_plan"] is not None
+        assert data["remediation_plan"]["phases_count"] == 1
+
+    def test_json_remediation_plan_has_phases(self) -> None:
+        result = _make_harden_result()
+        result.remediation_plan = _make_plan()
+        with patch("aeos.cli.run_reclaim_harden", return_value=result):
+            r = runner.invoke(
+                app, ["reclaim", "harden", "--path", "/fake/project", "--json"]
+            )
+        data = json.loads(r.output)
+        phases = data["remediation_plan"]["phases"]
+        assert isinstance(phases, list)
+        assert len(phases) == 1
+        ph = phases[0]
+        assert "id" in ph
+        assert "priority" in ph
+        assert "goal" in ph
+        assert "actions" in ph
+        assert "automation_level" in ph
+        assert "risk_if_skipped" in ph
+
+    def test_json_remediation_plan_none_when_not_set(self) -> None:
+        result = _make_harden_result()
+        result.remediation_plan = None
+        with patch("aeos.cli.run_reclaim_harden", return_value=result):
+            r = runner.invoke(
+                app, ["reclaim", "harden", "--path", "/fake/project", "--json"]
+            )
+        data = json.loads(r.output)
+        assert data["remediation_plan"] is None
+
+    def test_text_output_shows_remediation_plan_summary(self) -> None:
+        result = _make_harden_result()
+        result.remediation_plan = _make_plan()
+        with patch("aeos.cli.run_reclaim_harden", return_value=result):
+            r = runner.invoke(app, ["reclaim", "harden", "--path", "/fake/project"])
+        assert "Remediation Plan" in r.output
+        assert "phase_0" in r.output
+
+    def test_text_output_no_plan_section_when_none(self) -> None:
+        result = _make_harden_result()
+        result.remediation_plan = None
+        with patch("aeos.cli.run_reclaim_harden", return_value=result):
+            r = runner.invoke(app, ["reclaim", "harden", "--path", "/fake/project"])
+        assert "Remediation Plan" not in r.output
+
+    def test_markdown_no_plan_section_when_none(self) -> None:
+        result = _make_harden_result()
+        result.remediation_plan = None
+        report = build_harden_report(result)
+        assert "## Remediation Plan" not in report
+
+    def test_output_file_contains_remediation_plan(self, tmp_path: Path) -> None:
+        out = tmp_path / "report.md"
+        result = _make_harden_result()
+        result.remediation_plan = _make_plan()
+        with patch("aeos.cli.run_reclaim_harden", return_value=result):
+            runner.invoke(
+                app,
+                [
+                    "reclaim",
+                    "harden",
+                    "--path",
+                    "/fake/project",
+                    "--output",
+                    str(out),
+                ],
+            )
+        content = out.read_text()
+        assert "## Remediation Plan" in content
+        assert "Phase 0" in content
 
 
 # ---------------------------------------------------------------------------

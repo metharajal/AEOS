@@ -367,20 +367,96 @@ No database connection was opened.
 | Limit | Detail |
 |---|---|
 | No apply gate | `reclaim harden` cannot apply fixes. It only produces a report and a SQL proposal via `supabase rls harden --output`. Applying migrations is a deliberate human action. |
-| No remediation bundles | Each finding points to the relevant sub-command, but there is no `--fix` flag or automated patch bundle yet. |
 | No CI integration output | JSON output is machine-readable but there is no native GitHub Actions annotation format. |
 | Single-provider RLS | RLS harden only targets Supabase PostgreSQL migrations. Firebase, PlanetScale, and other providers are detected but not analyzed at the SQL level. |
 | Git history scan is shallow | Secret exposure detection uses `git log --oneline -- .env`. It detects presence, not content. |
 | Exit options are static | The five paths are always emitted with fixed complexity/sovereignty ratings. They do not yet adapt dynamically to the detected provider stack. |
+| Remediation plan is rule-based | Phase priorities and actions are derived from audit findings deterministically. No AI inference is used at this stage. |
 
 ---
 
-## 11. Next Steps
+## 11. Remediation Plan
+
+`reclaim harden` now includes a 5-phase remediation plan built from audit findings.
+
+### Phases
+
+| Phase | Label | Priority | Automation |
+|---|---|---|---|
+| Phase 0 | Immediate security stabilization | `critical` if secrets exposed · `medium` otherwise | manual |
+| Phase 1 | Database and RLS hardening | `critical` if BLOCKED · `high` if WARNING | `generatable` if auto blocks exist |
+| Phase 2 | Application control recovery | `high` if generator detected · `medium` otherwise | assisted |
+| Phase 3 | Portability preparation | `medium` if portability weak/partial · `low` otherwise | assisted |
+| Phase 4 | Strategic exit path | `low` always | manual |
+
+### Phase content
+
+Each phase includes:
+- `priority` — `critical` · `high` · `medium` · `low`
+- `goal` — what this phase achieves
+- `why_it_matters` — consequence of not doing it
+- `actions` — concrete ordered steps, tailored to the detected project state
+- `automation_level` — `manual` · `assisted` · `generatable`
+- `expected_outcome` — observable result when the phase is complete
+- `risk_if_skipped` — what happens if this phase is skipped
+
+### Text output summary
+
+```
+── Remediation Plan ──────────────────────────────────
+  5 phases · 3 immediate · 8 manual · 25 generatable · 5 strategic paths
+  ✗ [critical ] phase_0 — Immediate security stabilization
+  ⚠ [high     ] phase_1 — Database and RLS hardening
+  ⚠ [high     ] phase_2 — Application control recovery
+  · [medium   ] phase_3 — Portability preparation
+  · [low      ] phase_4 — Strategic exit path
+  → Run with --output to export the full plan.
+```
+
+### Markdown export
+
+`--output <file>` includes the full `## Remediation Plan` section with all 5 phases.
+
+### JSON schema
+
+```json
+"remediation_plan": {
+  "phases_count": 5,
+  "immediate_actions_count": 3,
+  "manual_actions_count": 8,
+  "generatable_actions_count": 25,
+  "strategic_options_count": 5,
+  "phases": [
+    {
+      "id": "phase_0",
+      "label": "Immediate security stabilization",
+      "priority": "critical",
+      "goal": "...",
+      "actions": ["...", "..."],
+      "automation_level": "manual",
+      "expected_outcome": "...",
+      "risk_if_skipped": "..."
+    }
+  ]
+}
+```
+
+### Invariants
+
+The remediation plan is **diagnostic only**:
+- `read_only: true` — no phase applies any fix
+- `applied: false` — no migration is run
+- No secret value appears in any phase action
+- No database connection is made
+
+---
+
+## 12. Next Steps
 
 | Item | Status | Description |
 |---|---|---|
 | Output flag (`--output`) | **Done — Sprint 3C** | `--output <file>` writes a Markdown report · `--overwrite` to replace · `--json --output` adds `output_written` and `output_path` |
-| Remediation bundles | Planned | Packaged output combining the SQL proposal, the check results, and a step-by-step action plan into a single exportable artifact |
+| Remediation Plan | **Done — Sprint 3E** | 5-phase plan in text · JSON · Markdown report · rule-based, human-validated |
 | Apply gate | Planned | A guarded `reclaim apply` command that reads a bundle, verifies invariants, and presents each change for human confirmation before any write |
 | Dynamic exit options | Planned | Exit options scored against the actual project topology (detected providers, missing assets, portability score) |
 | Multi-provider RLS | Planned | RLS analysis for Firebase Firestore security rules and other provider-specific access control models |

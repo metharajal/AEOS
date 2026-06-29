@@ -41,6 +41,29 @@ class ReclaimHardenSummary:
 
 
 @dataclass
+class RemediationPhase:
+    id: str  # "phase_0" … "phase_4"
+    label: str
+    priority: str  # "critical" | "high" | "medium" | "low"
+    goal: str
+    why_it_matters: str
+    actions: list[str]
+    automation_level: str  # "manual" | "assisted" | "generatable"
+    expected_outcome: str
+    risk_if_skipped: str
+
+
+@dataclass
+class RemediationPlan:
+    phases: list[RemediationPhase]
+    phases_count: int
+    immediate_actions_count: int  # Phase 0 action count
+    manual_actions_count: int  # actions in manual phases
+    generatable_actions_count: int  # RLS auto-generated blocks
+    strategic_options_count: int  # always 5
+
+
+@dataclass
 class ReclaimHardenResult:
     path: Path
     status: str  # OK | WARNING | ERROR
@@ -52,6 +75,7 @@ class ReclaimHardenResult:
     rls: RLSHardenResult | None
     recommendations: list[str] = field(default_factory=list)
     exit_options: list[str] = field(default_factory=list)
+    remediation_plan: RemediationPlan | None = None
     read_only: bool = True
     applied: bool = False
 
@@ -193,6 +217,270 @@ def _build_exit_options(reclaim: ReclaimInspectResult) -> list[str]:
     ]
 
 
+def _build_remediation_plan(
+    summary: ReclaimHardenSummary,
+    reclaim: ReclaimInspectResult,
+    security: SecurityCheckResult,
+    rls: RLSHardenResult | None,
+    path: Path,
+) -> RemediationPlan:
+    """Build a 5-phase remediation plan from audit sub-results. Read-only."""
+    path_str = str(path)
+    cm = reclaim.control_map
+
+    # ── Phase 0 — Immediate security stabilization ───────────────────────────
+    p0_priority = (
+        "critical"
+        if cm.secrets_exposure in ("confirmed", "risk") or summary.critical_findings > 0
+        else "medium"
+    )
+    p0_actions: list[str] = []
+    if cm.secrets_exposure == "confirmed":
+        p0_actions.append("Rotate all exposed credentials — they are in Git history.")
+        p0_actions.append("Remove .env from Git tracking: git rm --cached .env")
+        p0_actions.append("Add .env to .gitignore and push a clean commit.")
+    elif cm.secrets_exposure == "risk":
+        p0_actions.append("Remove .env from Git tracking before the next push.")
+        p0_actions.append("Rotate keys as a precaution even if not yet confirmed.")
+    for sf in security.findings:
+        if sf.severity == "ERROR":
+            p0_actions.append(f"Fix: {sf.message} ({sf.location})")
+    if not p0_actions:
+        p0_actions.append("No immediate security blocker — proceed to Phase 1.")
+
+    phase_0 = RemediationPhase(
+        id="phase_0",
+        label="Immediate security stabilization",
+        priority=p0_priority,
+        goal="Neutralize all active security risks before any other action.",
+        why_it_matters=(
+            "Exposed credentials remain active until rotated. Any push or deployment "
+            "before rotation extends the breach window."
+        ),
+        actions=p0_actions,
+        automation_level="manual",
+        expected_outcome=(
+            "No exposed credentials in Git history. No active security blockers. "
+            "Baseline is safe to continue."
+        ),
+        risk_if_skipped=(
+            "Credentials remain compromised. Any deployment amplifies the breach. "
+            "Security findings block safe migration."
+        ),
+    )
+
+    # ── Phase 1 — Database and RLS hardening ─────────────────────────────────
+    if rls is not None:
+        if rls.review.verdict == "BLOCKED":
+            p1_priority = "critical"
+        elif rls.review.verdict == "WARNING":
+            p1_priority = "high"
+        else:
+            p1_priority = "medium"
+    elif summary.supabase_status is not None:
+        p1_priority = "high"
+    else:
+        p1_priority = "low"
+
+    p1_actions: list[str] = []
+    if rls is not None:
+        if rls.summary.auto_blocks:
+            p1_actions.append(
+                f"Export {rls.summary.auto_blocks} auto-generated RLS block(s): "
+                f"`aeos supabase rls harden --path {path_str} "
+                "--output /tmp/rls-proposal.sql --force-warning`"
+            )
+        if rls.summary.todo_blocks:
+            p1_actions.append(
+                f"Review {rls.summary.todo_blocks} manual RLS TODO block(s) "
+                "before applying any migration."
+            )
+        if rls.review.verdict == "BLOCKED":
+            p1_actions.append(
+                "Resolve blocked migration patterns before exporting any SQL."
+            )
+    if summary.supabase_status in ("ERROR", "CRITICAL"):
+        p1_actions.append(
+            "Run `aeos supabase check` and complete all critical remediation steps."
+        )
+    if not p1_actions:
+        p1_actions.append(
+            "No Supabase or RLS detected — database hardening not applicable."
+        )
+
+    p1_automation = (
+        "generatable" if rls is not None and rls.summary.auto_blocks > 0 else "manual"
+    )
+
+    phase_1 = RemediationPhase(
+        id="phase_1",
+        label="Database and RLS hardening",
+        priority=p1_priority,
+        goal="Secure data access at the database layer before any migration.",
+        why_it_matters=(
+            "Permissive RLS policies expose rows to unauthorized users. "
+            "SQL blocks can be auto-generated — but must be human-reviewed "
+            "before apply."
+        ),
+        actions=p1_actions,
+        automation_level=p1_automation,
+        expected_outcome=(
+            "RLS policies reviewed. Auto-generated SQL exported and inspected. "
+            "No permissive SELECT or missing WITH CHECK clauses."
+        ),
+        risk_if_skipped=(
+            "Data remains accessible to unauthenticated or over-privileged users "
+            "even after migration."
+        ),
+    )
+
+    # ── Phase 2 — Application control recovery ───────────────────────────────
+    any_generator = any(g.detected for g in reclaim.generators)
+    p2_priority = "high" if any_generator else "medium"
+
+    p2_actions: list[str] = []
+    if any_generator:
+        gen_name = summary.generator_detected or "the generator"
+        p2_actions.append(
+            f"Audit all {gen_name}-specific patterns in the codebase "
+            "(`.lovable/`, `src/integrations/supabase/`, etc.)."
+        )
+        p2_actions.append(
+            "Replace generator-managed Supabase client with a project-owned client."
+        )
+        p2_actions.append(
+            "Document all architecture decisions made implicitly by the generator."
+        )
+    if cm.backend_runtime in ("likely_external", "external"):
+        p2_actions.append(
+            "Identify if a local backend exists or must be created "
+            "(`server/`, `api/`, `backend/`)."
+        )
+    if not p2_actions:
+        p2_actions.append(
+            "Application layer appears controlled — document ownership explicitly."
+        )
+
+    phase_2 = RemediationPhase(
+        id="phase_2",
+        label="Application control recovery",
+        priority=p2_priority,
+        goal="Recover technical ownership of the application layer.",
+        why_it_matters=(
+            "Generator-managed code contains implicit decisions about stack, auth, "
+            "and API patterns. Until documented and owned, evolution depends on "
+            "the generator platform."
+        ),
+        actions=p2_actions,
+        automation_level="assisted",
+        expected_outcome=(
+            "Every architectural decision is documented and consciously owned. "
+            "No hidden generator dependencies block future evolution."
+        ),
+        risk_if_skipped=(
+            "Application evolution remains tied to the generator. "
+            "Technical debt accumulates invisibly."
+        ),
+    )
+
+    # ── Phase 3 — Portability preparation ────────────────────────────────────
+    p3_priority = "medium" if cm.portability in ("weak", "partial") else "low"
+
+    p3_actions: list[str] = []
+    if cm.deployment in ("likely_external", "external"):
+        p3_actions.append(
+            "Add a Dockerfile and docker-compose.yml to enable local execution."
+        )
+    if cm.database_schema in ("missing", "partial"):
+        p3_actions.append(
+            "Export the current database schema to local migration files."
+        )
+    if cm.backend_runtime in ("likely_external", "external"):
+        p3_actions.append(
+            "Create a local backend directory (`server/` or `api/`) with a stub."
+        )
+    p3_actions.append(
+        "Run `aeos reclaim inspect` after each improvement "
+        "to track portability score progress."
+    )
+    if not p3_actions or len(p3_actions) == 1:
+        p3_actions.insert(0, "Portability is already partial — focus on Dockerfile.")
+
+    phase_3 = RemediationPhase(
+        id="phase_3",
+        label="Portability preparation",
+        priority=p3_priority,
+        goal="Prepare the project for a possible provider exit.",
+        why_it_matters=(
+            "Without Dockerfile, local schema, and local backend, "
+            "migration to any alternative stack costs significantly more. "
+            "Portability should be built incrementally, not urgently."
+        ),
+        actions=p3_actions,
+        automation_level="assisted",
+        expected_outcome=(
+            "Project can be cloned, started locally, and deployed to a different "
+            "provider without requiring the original generator platform."
+        ),
+        risk_if_skipped=(
+            "When migration becomes necessary (cost, compliance, platform change), "
+            "it will be significantly more expensive and disruptive."
+        ),
+    )
+
+    # ── Phase 4 — Strategic exit path ────────────────────────────────────────
+    exit_labels = (
+        [opt.label for opt in reclaim.exit_options[:3]]
+        if reclaim.exit_options
+        else ["Stay and secure", "Migrate to own account", "Self-host"]
+    )
+    first_exit = exit_labels[0] if exit_labels else "Stay and secure"
+
+    p4_actions: list[str] = [
+        "Review the 5 strategic exit options and select a target trajectory.",
+        f"Likely near-term path: {first_exit}.",
+        "Document the chosen target architecture in `docs/governance/`.",
+        "Define a migration timeline with milestones.",
+        "Run `aeos reclaim harden --output` monthly to track progress.",
+    ]
+
+    phase_4 = RemediationPhase(
+        id="phase_4",
+        label="Strategic exit path",
+        priority="low",
+        goal="Choose and plan the long-term target architecture.",
+        why_it_matters=(
+            "Without a defined trajectory, teams stay on the current provider "
+            "by inertia. A documented plan makes migration a decision, not a crisis."
+        ),
+        actions=p4_actions,
+        automation_level="manual",
+        expected_outcome=(
+            "Team has a defined, documented migration target. "
+            "The next `aeos reclaim harden` run will show measurable progress."
+        ),
+        risk_if_skipped=(
+            "Vendor lock-in accumulates. When migration becomes mandatory "
+            "(compliance, cost, platform EOL), the team has no plan."
+        ),
+    )
+
+    phases = [phase_0, phase_1, phase_2, phase_3, phase_4]
+
+    manual_count = sum(
+        len(ph.actions) for ph in phases if ph.automation_level == "manual"
+    )
+
+    return RemediationPlan(
+        phases=phases,
+        phases_count=len(phases),
+        immediate_actions_count=len(phase_0.actions),
+        manual_actions_count=manual_count,
+        generatable_actions_count=summary.generated_actions,
+        strategic_options_count=len(reclaim.exit_options),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -331,6 +619,51 @@ def build_harden_report(result: ReclaimHardenResult) -> str:
     for opt in result.exit_options:
         lines.append(f"- {opt}")
 
+    # ── Remediation Plan section ─────────────────────────────────────────────
+    if result.remediation_plan is not None:
+        plan = result.remediation_plan
+        lines += [
+            "",
+            _SEP,
+            "",
+            "## Remediation Plan",
+            "",
+            f"{plan.phases_count} phases · "
+            f"{plan.immediate_actions_count} immediate actions · "
+            f"{plan.manual_actions_count} manual · "
+            f"{plan.generatable_actions_count} generatable · "
+            f"{plan.strategic_options_count} strategic paths",
+        ]
+        _PRIORITY_ICON = {
+            "critical": "🔴 critical",
+            "high": "🟠 high",
+            "medium": "🟡 medium",
+            "low": "🟢 low",
+        }
+        for phase in plan.phases:
+            pid = phase.id.replace("_", " ").title()
+            prio_label = _PRIORITY_ICON.get(phase.priority, phase.priority)
+            lines += [
+                "",
+                f"### {pid} — {phase.label} [{prio_label}]",
+                "",
+                f"**Goal:** {phase.goal}",
+                "",
+                f"**Why it matters:** {phase.why_it_matters}",
+                "",
+                "**Actions:**",
+            ]
+            for action in phase.actions:
+                lines.append(f"- {action}")
+            lines += [
+                "",
+                f"**Automation level:** {phase.automation_level}",
+                "",
+                f"**Expected outcome:** {phase.expected_outcome}",
+                "",
+                f"**Risk if skipped:** {phase.risk_if_skipped}",
+            ]
+
     lines += [
         "",
         _SEP,
@@ -402,6 +735,9 @@ def run_reclaim_harden(path: Path) -> ReclaimHardenResult:
     status = _compute_status(reclaim, security, supabase, rls)
     recommendations = _build_recommendations(reclaim, security, supabase, rls, resolved)
     exit_options = _build_exit_options(reclaim)
+    remediation_plan = _build_remediation_plan(
+        summary, reclaim, security, rls, resolved
+    )
 
     return ReclaimHardenResult(
         path=resolved,
@@ -414,6 +750,7 @@ def run_reclaim_harden(path: Path) -> ReclaimHardenResult:
         rls=rls,
         recommendations=recommendations,
         exit_options=exit_options,
+        remediation_plan=remediation_plan,
         read_only=True,
         applied=False,
     )
