@@ -10,46 +10,41 @@
 
 | Élément | État |
 |---|---|
-| Branche `main` | Propre, à jour avec `origin/main` — commit `4e6c06c` |
-| CI | Verte (Quality Gate pass — 1316 tests) |
-| AEOS CLI | Fonctionnel — `aeos reclaim harden`, `aeos memory list`, `aeos memory show` |
+| Branche `main` | `a8f7e51` — Sprint 3G-1 mergé |
+| CI | Verte (1342 tests — sprint 3H local) |
+| AEOS CLI | `aeos reclaim harden`, `aeos memory list`, `aeos memory show`, `aeos memory compare` |
 | Memory Write | Sprint 3F — mergé, stable |
-| Memory Read CLI | Sprint 3G — **mergé** dans main (PR #36) |
-| Memory Usage Docs | Sprint 3G-1 — en cours |
+| Memory Read CLI | Sprint 3G — mergé dans main (PR #36) |
+| Memory Usage Docs | Sprint 3G-1 — mergé dans main (PR #37) |
+| Memory Compare | Sprint 3H — **en attente de merge** (branch `sprint3h/memory-compare`) |
 | `ma-mairie-digitale` | Untouched — projet client intact |
 | `.env` | Non lu, non tracké, non copié |
 
 ---
 
-## 2. Chaîne Memory disponible dans main
+## 2. Chaîne Memory disponible
 
 ```
-aeos reclaim harden --path <project> --memory-dir <dir>   →  crée un MemoryRecord JSON
-aeos memory list   --memory-dir <dir>                      →  liste tous les records
-aeos memory show   --memory-dir <dir> --record <id>        →  affiche un record en détail
+aeos reclaim harden --path <project> --memory-dir <dir>               →  crée un MemoryRecord
+aeos memory list   --memory-dir <dir>                                  →  liste tous les records
+aeos memory show   --memory-dir <dir> --record <id>                    →  affiche un record
+aeos memory compare --memory-dir <dir> --left <id> --right <id>        →  compare deux records
 ```
 
 Tous les modes `--json` sont disponibles. Tout est read-only. Aucun secret. Aucune DB.
+Sprint 3H (`memory compare`) est sur la branche `sprint3h/memory-compare` — pas encore dans main.
 
 ---
 
 ## 3. Prochains sprints recommandés
 
-### Priorité 1 — Sprint 3H : Memory Compare (recommandé)
+### Priorité 1 — Sprint 3H : Memory Compare (DONE)
 
-**Objectif :** Comparer deux records pour mesurer la progression entre deux audits.
+**Statut :** Livré — branch `sprint3h/memory-compare`, PR à créer.
 
 ```bash
-aeos memory compare --memory-dir <dir> --record-a <id> --record-b <id>
+aeos memory compare --memory-dir <dir> --left <id> --right <id> [--json]
 ```
-
-Affiche :
-- delta des findings (critical, important, manual, generated)
-- changement de status (ERROR → WARNING, etc.)
-- delta de control_level
-- évolution du remediation_summary
-
-Sans modifier aucun fichier. Read-only.
 
 ---
 
@@ -166,3 +161,4 @@ uv run aeos memory show \
 | 2026-06-29 | Création initiale — état post-sprint3f, memory layer mergé |
 | 2026-06-29 | Sprint 3G livré — Memory Read CLI (list + show), 28 tests |
 | 2026-06-29 | Sprint 3G-1 — documentation usage Memory CLI, prochains sprints 3H/3I/4A |
+| 2026-06-29 | Sprint 3H — Memory Compare livré (26 tests, `aeos memory compare`) |

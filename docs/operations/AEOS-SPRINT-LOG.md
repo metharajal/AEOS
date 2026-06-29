@@ -307,3 +307,35 @@ aeos memory show --memory-dir <dir> --record <record_id> --json
 - `docs/features/AEOS-MEMORY-LAYER.md` — guide d'usage end-to-end, garanties, limites, API mise à jour
 - `docs/operations/AEOS-SPRINT-LOG.md` — entrées sprint 3F-1, 3F-3, 3G ajoutées
 - `docs/operations/AEOS-NEXT-ACTIONS.md` — priorités mises à jour (3H, 3I, 4A)
+
+**PR / Commit :** PR #37 — mergé dans main (`a8f7e51`)
+**Statut :** DONE
+**Validation :** Documentation disponible dans `docs/features/AEOS-MEMORY-LAYER.md`.
+
+---
+
+## Sprint 3H — Memory Compare
+
+**Objectif :** Ajouter `aeos memory compare` pour comparer deux MemoryRecords et mesurer la progression entre deux audits.
+
+**Livraisons :**
+
+- `src/aeos/memory/compare.py` — `MemoryCompareDelta`, `MemoryCompareResult`, `compare_records()`, `load_record_reference()`, `compute_trend()`
+- `src/aeos/memory/__init__.py` — exports mis à jour
+- `src/aeos/cli.py` — sous-commande `memory compare`
+- `tests/unit/test_memory_compare.py` — 26 tests unitaires
+- `docs/features/AEOS-MEMORY-LAYER.md` — Section 10 Memory Compare ajoutée
+
+**Commandes ajoutées :**
+
+```bash
+aeos memory compare --memory-dir <dir> --left <record_id_or_path> --right <record_id_or_path>
+aeos memory compare --memory-dir <dir> --left <id> --right <id> --json
+```
+
+Synthesis categories : `improved` | `degraded` | `unchanged` | `mixed` | `incompatible`.
+`--left` / `--right` acceptent un record_id ou un chemin JSON direct.
+
+**PR / Commit :** Sprint 3H — branch `sprint3h/memory-compare`
+**Statut :** DONE — 1342 tests passés
+**Validation :** `uv run pytest` → 1342 passed. `aeos memory compare` fonctionnel.

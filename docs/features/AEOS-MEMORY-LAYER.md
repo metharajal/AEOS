@@ -1,8 +1,8 @@
 # AEOS Memory Layer
 
 **Date:** 2026-06-29
-**Status:** Feature — Sprint 3G (Read CLI available)
-**Sprints:** 3F (MVP write), 3G (Read CLI)
+**Status:** Feature — Sprint 3H (Compare available)
+**Sprints:** 3F (MVP write), 3G (Read CLI), 3H (Compare)
 **Module:** `src/aeos/memory/`
 
 ---
@@ -25,12 +25,13 @@ a structured record so that history is local, readable, and human-controllable.
 
 ## End-to-End Usage Guide
 
-The Memory Layer chain has three steps, each triggered by a separate command:
+The Memory Layer chain has four steps, each triggered by a separate command:
 
 ```
-aeos reclaim harden --memory-dir <dir>   →   creates a MemoryRecord JSON file
-aeos memory list   --memory-dir <dir>    →   lists all records in that directory
-aeos memory show   --memory-dir <dir> --record <id>   →   shows one record in detail
+aeos reclaim harden --memory-dir <dir>                       →  creates a MemoryRecord
+aeos memory list   --memory-dir <dir>                        →  lists all records
+aeos memory show   --memory-dir <dir> --record <id>          →  shows one record in detail
+aeos memory compare --memory-dir <dir> --left <id> --right <id>  →  compares two records
 ```
 
 ### Step 1 — Create a MemoryRecord
@@ -190,11 +191,11 @@ aeos memory show \
 | List records | Yes — `aeos memory list` |
 | Show a record in detail | Yes — `aeos memory show` |
 
-### What AEOS does NOT do (yet)
+### What AEOS does NOT do
 
 | Action | Status |
 |---|---|
-| Compare two records (diff) | Not yet — planned Sprint 3H |
+| Compare two records (diff) | **Done — Sprint 3H** (`aeos memory compare`) |
 | Search across records | Not yet — planned |
 | Modify a record | Never — all read operations are read-only |
 | Apply any fix from a record | Never without explicit human gate |
@@ -240,9 +241,11 @@ aeos memory show \
 src/aeos/memory/
 ├── __init__.py        public API — see Section 8
 ├── models.py          MemoryRecord, MemoryRecordSummary, MemoryListResult
-└── store.py           write: build_memory_record_from_reclaim_harden(), save_record()
-                       read:  list_records(), load_record(), find_record_path()
-                       guard: _looks_like_secret_value(), _iter_string_leaves()
+├── store.py           write: build_memory_record_from_reclaim_harden(), save_record()
+│                      read:  list_records(), load_record(), find_record_path()
+│                      guard: _looks_like_secret_value(), _iter_string_leaves()
+└── compare.py         MemoryCompareDelta, MemoryCompareResult
+                       compare_records(), load_record_reference(), compute_trend()
 ```
 
 ---
@@ -447,10 +450,29 @@ record = load_record(Path("/tmp/aeos-memory"), "ma-mairie-digitale-20260629T1156
 path = find_record_path(Path("/tmp/aeos-memory"), "ma-mairie-digitale-20260629T115627-e94541fc")
 ```
 
+### Compare (Sprint 3H)
+
+```python
+from aeos.memory import compare_records, load_record_reference, MemoryCompareResult
+
+mem_dir = Path("/tmp/aeos-memory")
+
+# Load two records (accepts record_id or direct JSON file path)
+left = load_record_reference(mem_dir, "ma-mairie-digitale-20260629T115627-e94541fc")
+right = load_record_reference(mem_dir, "ma-mairie-digitale-20260630T093012-b2c3d4e5")
+
+# Compare (returns MemoryCompareResult)
+result = compare_records(left, right)
+print(result.synthesis)     # "improved" | "degraded" | "unchanged" | "mixed" | "incompatible"
+print(result.improved)      # list[MemoryCompareDelta]
+print(result.degraded)      # list[MemoryCompareDelta]
+```
+
 ### Models
 
 ```python
 from aeos.memory import MemoryRecord, MemoryRecordSummary, MemoryListResult
+from aeos.memory import MemoryCompareDelta, MemoryCompareResult
 ```
 
 | Model | Used for |
@@ -458,6 +480,8 @@ from aeos.memory import MemoryRecord, MemoryRecordSummary, MemoryListResult
 | `MemoryRecord` | Full record — all fields |
 | `MemoryRecordSummary` | Lightweight view for `list` output |
 | `MemoryListResult` | Wraps `list[MemoryRecordSummary]` + `skipped_files` |
+| `MemoryCompareDelta` | Delta for a single field: field, left_value, right_value, trend |
+| `MemoryCompareResult` | Full comparison result: synthesis, improved, degraded, unchanged |
 
 ---
 
@@ -580,28 +604,97 @@ Read-only — no files modified.
 
 ---
 
-## 10. Current Limits
+## 10. `aeos memory compare` (Sprint 3H)
+
+Compare two records to measure progression between two audits.
+
+```bash
+aeos memory compare \
+  --memory-dir /tmp/aeos-memory \
+  --left  ma-mairie-digitale-20260629T115627-e94541fc \
+  --right ma-mairie-digitale-20260630T093012-b2c3d4e5
+```
+
+The `--left` and `--right` options accept either a **record_id** (looked up in
+`--memory-dir`) or a **direct JSON file path** (loaded without scanning the directory).
+
+**Text output example:**
+
+```
+Memory Compare
+Left:      ma-mairie-digitale-20260629T115627-e94541fc
+Right:     ma-mairie-digitale-20260630T093012-b2c3d4e5
+Project:   ma-mairie-digitale
+Synthesis: improved
+
+── Improved (3) ────────────────────────────────────────
+  status           ERROR → OK
+  control_level    weak → controlled
+  critical         5 → 0
+
+── Unchanged (4) ───────────────────────────────────────
+  important        12 (unchanged)
+  manual           8 (unchanged)
+  generated        25 (unchanged)
+  phases_count     5 (unchanged)
+
+Read-only — no files modified.
+```
+
+**JSON output:** `--json` returns a structured payload with `synthesis`, `improved`,
+`degraded`, `unchanged`, and `incompatible_fields` arrays.
+
+**Fields compared:**
+
+| Field | Direction |
+|---|---|
+| `status` | `OK` > `WARNING` > `ERROR` — higher is better |
+| `control_level` | `controlled` > `partial` > `weak` — higher is better |
+| `critical` | lower is better |
+| `important` | lower is better |
+| `manual` | lower is better |
+| `generated` | informational — no trend judgment |
+| `phases_count` | lower is better (if present in both records) |
+
+**Synthesis categories:**
+
+| Value | Meaning |
+|---|---|
+| `improved` | At least one field improved, none degraded |
+| `degraded` | At least one field degraded, none improved |
+| `mixed` | Some fields improved, some degraded |
+| `unchanged` | No field changed |
+| `incompatible` | Records are from different projects |
+
+**Constraints:**
+- Read-only — no files modified, no records updated.
+- Local-only — no network, no AI, no `.env`, no database.
+- Project names must match — comparing records from different projects returns `incompatible`.
+
+---
+
+## 11. Current Limits
 
 | Limit | Detail |
 |---|---|
 | Single-command coverage | Only `reclaim harden` builds memory records. Other rails (security, supabase) are not yet wired. |
 | No memory search | Records must be browsed by record_id. Full-text or field-based search is planned. |
 | No deduplication | Each run creates a new file. Old records are not pruned automatically. |
-| No diff | No comparison between successive records for the same project. |
-| No compare/search/learn | Planned for a future sprint after foundational read CLI is stable. |
+| No timeline view | Planned Sprint 3I — `aeos memory timeline --project <name>`. |
 
 ---
 
-## 11. Next Steps
+## 12. Next Steps
 
 | Item | Status |
 |---|---|
 | Memory MVP — `reclaim harden` | **Done — Sprint 3F** |
 | Memory read CLI (`aeos memory list`, `aeos memory show`) | **Done — Sprint 3G** |
+| Memory compare (`aeos memory compare`) | **Done — Sprint 3H** |
 | Memory for other rails (security, supabase) | Planned |
-| Record diff — compare successive audits | Planned |
+| Memory timeline — `aeos memory timeline --project <name>` | Planned — Sprint 3I |
 | Human validation workflow (`human_validated: true`, `notes`) | Planned |
-| Memory search (`aeos memory search`) | Planned — after compare/diff |
+| Memory search (`aeos memory search`) | Planned |
 | Memory learn — pattern extraction from history | Future |
 
 ---
