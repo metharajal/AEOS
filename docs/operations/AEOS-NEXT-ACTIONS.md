@@ -10,20 +10,21 @@
 
 | Élément | État |
 |---|---|
-| Branche `main` | `f7ed7e9` — Sprint 3H-1 mergé |
-| CI | Verte (1364 tests — sprint 3I local) |
-| AEOS CLI | `reclaim harden`, `memory list`, `memory show`, `memory compare`, `memory timeline` |
+| Branche `main` | `8410c28` — Sprint 3I mergé (PR #40) |
+| CI | Verte (1382 tests — sprint 4A local) |
+| AEOS CLI | `reclaim harden`, `memory list`, `memory show`, `memory compare`, `memory timeline`, `build plan` |
 | Memory Write | Sprint 3F — mergé, stable |
 | Memory Read CLI | Sprint 3G — mergé dans main (PR #36) |
 | Memory Compare | Sprint 3H — mergé dans main (PR #38) |
 | Memory Compare Validation | Sprint 3H-1 — mergé dans main (PR #39) |
-| Memory Timeline | Sprint 3I — **en attente de merge** (branch `sprint3i/memory-timeline-mvp`) |
+| Memory Timeline | Sprint 3I — mergé dans main (PR #40) |
+| Build Rail MVP | Sprint 4A — **en attente de merge** (branch `sprint4a/build-rail-mvp`) |
 | `ma-mairie-digitale` | Untouched — projet client intact |
 | `.env` | Non lu, non tracké, non copié |
 
 ---
 
-## 2. Chaîne Memory disponible dans main
+## 2. Chaîne de commandes disponible dans main
 
 ```
 aeos reclaim harden  --path <project> --memory-dir <dir>               →  crée un MemoryRecord
@@ -31,10 +32,11 @@ aeos memory list     --memory-dir <dir>                                 →  lis
 aeos memory show     --memory-dir <dir> --record <id>                   →  affiche un record
 aeos memory compare  --memory-dir <dir> --left <id> --right <id>        →  compare deux records
 aeos memory timeline --memory-dir <dir> --project <name>                →  timeline du projet
+aeos build plan      --name <name> --type <type> --stack <stack>        →  plan d'architecture
 ```
 
 Tous les modes `--json` sont disponibles. Tout est read-only. Aucun secret. Aucune DB.
-Sprint 3I (`memory timeline`) est sur la branche `sprint3i/memory-timeline-mvp` — PR en attente.
+Sprint 4A (`build plan`) est sur la branche `sprint4a/build-rail-mvp` — PR en attente.
 
 ---
 
@@ -56,17 +58,28 @@ aeos memory timeline --memory-dir <dir> --project <name> [--json]
 
 ---
 
-### Priorité 3 — Sprint 4A : Build Rail MVP
+### Priorité 3 — Sprint 4A : Build Rail MVP (DONE)
 
-**Objectif :** Démarrer le rail Build — scaffolding de projets AEOS-native.
+**Statut :** Livré — branch `sprint4a/build-rail-mvp`, PR en attente de merge.
 
-Premier jalon :
 ```bash
-aeos build scaffold --name <project> --type python
+aeos build plan --name <project> --type <type> --stack <stack> [--json]
 ```
 
-Génère un projet Python AEOS-native avec :
-`pyproject.toml`, `src/`, `tests/`, `docs/`, `.gitignore`, `aeos.toml`, CI skeleton.
+Types : `web-app` · `api` · `internal-tool`
+Stacks : `nextjs-supabase` · `nextjs-postgres` · `fastapi-postgres` · `generic`
+
+### Priorité 4 — Sprint 4B : Build Scaffold MVP
+
+**Objectif :** Générer la structure de dossiers et fichiers governance pour un
+nouveau projet AEOS-native.
+
+```bash
+aeos build scaffold --name <project> --type <type> --stack <stack>
+```
+
+Génère dans un dossier vide : folder structure, governance files, .env.example,
+.gitignore, README.md, ARCHITECTURE.md, docs/DECISIONS.md.
 
 ---
 
@@ -158,3 +171,4 @@ uv run aeos memory show \
 | 2026-06-29 | Sprint 3G-1 — documentation usage Memory CLI, prochains sprints 3H/3I/4A |
 | 2026-06-29 | Sprint 3H — Memory Compare livré (26 tests, `aeos memory compare`) |
 | 2026-06-30 | Sprint 3I — Memory Timeline livré (22 tests, `aeos memory timeline`) |
+| 2026-06-30 | Sprint 4A — Build Rail MVP livré (18 tests, `aeos build plan`) |

@@ -34,6 +34,7 @@ supabase_app = typer.Typer(help="Supabase integration audit and remediation.")
 supabase_rls_app = typer.Typer(help="Supabase RLS policy inspection.")
 reclaim_app = typer.Typer(help="Project reclaim and sovereignty analysis.")
 memory_app = typer.Typer(help="Memory Layer — read and inspect local audit records.")
+build_app = typer.Typer(help="Build Rail — plan and scaffold AEOS-native projects.")
 app.add_typer(project_app, name="project")
 app.add_typer(ai_app, name="ai")
 app.add_typer(sovereignty_app, name="sovereignty")
@@ -42,6 +43,7 @@ app.add_typer(supabase_app, name="supabase")
 supabase_app.add_typer(supabase_rls_app, name="rls")
 app.add_typer(reclaim_app, name="reclaim")
 app.add_typer(memory_app, name="memory")
+app.add_typer(build_app, name="build")
 
 REQUIRED_TOOLS = ["python", "uv", "git", "docker", "node", "pnpm", "gh", "code"]
 
@@ -2429,3 +2431,71 @@ def memory_timeline(
 
     typer.echo("")
     typer.echo("Read-only — no files modified.")
+
+
+# ---------------------------------------------------------------------------
+# build plan
+# ---------------------------------------------------------------------------
+
+
+@build_app.command("plan")
+def build_plan_cmd(
+    name: str = typer.Option(..., "--name", help="Project name."),
+    project_type: str = typer.Option(..., "--type", help="Project type."),
+    stack: str = typer.Option(..., "--stack", help="Technology stack."),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Generate a structured build plan for a new project (read-only)."""
+    from aeos.build.planner import build_plan_to_dict, create_build_plan
+
+    try:
+        plan = create_build_plan(name, project_type, stack)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+
+    if as_json:
+        typer.echo(json.dumps(build_plan_to_dict(plan), indent=2))
+        return
+
+    typer.echo("")
+    typer.echo("── Build Plan ───────────────────────────────────────────")
+    typer.echo("")
+    typer.echo("── Project Identity ─────────────────────────────────────")
+    typer.echo(f"  name:  {plan.project_name}")
+    typer.echo(f"  type:  {plan.project_type}")
+    typer.echo(f"  stack: {plan.stack}")
+    typer.echo("")
+    typer.echo("── Architecture Summary ─────────────────────────────────")
+    typer.echo(f"  {plan.architecture_summary}")
+    typer.echo("")
+    typer.echo("── Suggested Folder Structure ───────────────────────────")
+    for item in plan.folder_structure:
+        typer.echo(f"  {item}")
+    typer.echo("")
+    typer.echo("── Required Governance Files ────────────────────────────")
+    for gov_file in plan.governance_files:
+        typer.echo(f"  {gov_file}")
+    typer.echo("")
+    typer.echo("── Security Baseline ────────────────────────────────────")
+    for item in plan.security_baseline:
+        typer.echo(f"  • {item}")
+    typer.echo("")
+    typer.echo("── Sovereignty Baseline ─────────────────────────────────")
+    for item in plan.sovereignty_baseline:
+        typer.echo(f"  • {item}")
+    typer.echo("")
+    typer.echo("── Testing Baseline ─────────────────────────────────────")
+    for item in plan.testing_baseline:
+        typer.echo(f"  • {item}")
+    typer.echo("")
+    typer.echo("── Deployment Baseline ──────────────────────────────────")
+    for item in plan.deployment_baseline:
+        typer.echo(f"  • {item}")
+    typer.echo("")
+    typer.echo("── Recommended Next Steps ───────────────────────────────")
+    for i, step in enumerate(plan.recommended_next_steps, start=1):
+        typer.echo(f"  {i}. {step}")
+    typer.echo("")
+    typer.echo("Read-only — no project created, no files modified.")
+    typer.echo("  read_only: true  ·  applied: false")

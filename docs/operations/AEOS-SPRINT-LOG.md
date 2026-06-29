@@ -417,3 +417,44 @@ Colonnes affichées : date, record_id, status, control_level, critical, importan
 **PR / Commit :** Sprint 3I — branch `sprint3i/memory-timeline-mvp`
 **Statut :** DONE — 1364 tests passés
 **Validation :** `uv run pytest` → 1364 passed. `aeos memory timeline` fonctionnel.
+
+---
+
+## Sprint 4A — Build Rail MVP
+
+**Objectif :** Ajouter le premier MVP du rail Build dans AEOS.
+Commande : `aeos build plan --name <name> --type <type> --stack <stack>`.
+Produit un plan d'architecture structuré en texte et JSON. Read-only.
+
+**Livraisons :**
+
+- `src/aeos/build/__init__.py` — module Build Rail, exports publics
+- `src/aeos/build/planner.py` — `BuildPlan`, `create_build_plan()`,
+  `build_plan_to_dict()`, `validate_project_type()`, `validate_stack()`
+- `src/aeos/cli.py` — sous-commande `build plan` + Typer `build_app`
+- `tests/unit/test_build_planner.py` — 18 tests unitaires
+- `docs/features/AEOS-BUILD-RAIL.md` — documentation complète du rail Build
+- `docs/strategy/AEOS-PRODUCT-RAILS-AND-AGENTS.md` — section Build Rail mise à jour
+
+**Commandes ajoutées :**
+
+```bash
+aeos build plan --name <project> --type <type> --stack <stack>
+aeos build plan --name <project> --type <type> --stack <stack> --json
+```
+
+Types : `web-app` · `api` · `internal-tool`
+Stacks : `nextjs-supabase` · `nextjs-postgres` · `fastapi-postgres` · `generic`
+
+**Sections du plan généré :**
+Project Identity · Architecture Summary · Folder Structure · Governance Files ·
+Security Baseline · Sovereignty Baseline · Testing Baseline · Deployment Baseline ·
+Recommended Next Steps.
+
+**Garanties :**
+`read_only: true` · `applied: false` · Aucun projet créé · Aucun secret · Aucun
+appel réseau · Aucun appel IA externe.
+
+**PR / Commit :** Sprint 4A — branch `sprint4a/build-rail-mvp`
+**Statut :** DONE — 1382 tests passés
+**Validation :** `uv run pytest` → 1382 passed. `aeos build plan` fonctionnel.

@@ -53,13 +53,31 @@ The reclaim capability is one rail among nine. It is not the identity of AEOS.
 - sovereignty by default (no Supabase lock-in, no Vercel lock-in unless explicitly chosen)
 - local AI configuration built in
 
-**Commands (current + future):**
+**Commands (Sprint 4A — production-ready):**
 ```
-aeos new <project> --type saas
-aeos blueprint create
-aeos architecture plan
-aeos quality
-aeos sovereignty check
+aeos build plan --name <project> --type <type> --stack <stack>
+aeos build plan --name <project> --type <type> --stack <stack> --json
+```
+
+Types: `web-app` · `api` · `internal-tool`
+Stacks: `nextjs-supabase` · `nextjs-postgres` · `fastapi-postgres` · `generic`
+
+Produces: architecture summary, folder structure, governance files, security
+baseline, sovereignty baseline, testing baseline, deployment baseline, next steps.
+
+**Invariants enforced on every Build command:**
+- `read_only: true` — no project created, no client file modified
+- `applied: false` — no action applied without human gate
+- No `.env` file read
+- No secret value displayed or logged
+- No network access. No AI inference.
+
+**Future commands:**
+```
+aeos build scaffold   # generate folder structure and governance files
+aeos build review     # audit a project under construction
+aeos build generate   # generate components with human control
+aeos build apply      # apply an action with explicit human gate
 ```
 
 ---
@@ -431,6 +449,7 @@ Agents propose. Humans decide. Memory records what was validated. The loop is al
 ## See Also
 
 - [`docs/strategy/AEOS-PRODUCT-VISION.md`](AEOS-PRODUCT-VISION.md) — full strategic vision with use cases, target users, and positioning
+- [`docs/features/AEOS-BUILD-RAIL.md`](../features/AEOS-BUILD-RAIL.md) — Build Rail MVP documentation
 - [`docs/features/AEOS-RECLAIM-HARDEN.md`](../features/AEOS-RECLAIM-HARDEN.md) — Reclaim Rail harden command documentation
 - [`docs/features/AEOS-SUPABASE-RLS-HARDENING.md`](../features/AEOS-SUPABASE-RLS-HARDENING.md) — RLS hardening chain documentation
 - [`docs/research/AEOS-RESEARCH-BACKLOG-LOCAL-FIRST-SOVEREIGNTY.md`](../research/AEOS-RESEARCH-BACKLOG-LOCAL-FIRST-SOVEREIGNTY.md) — research backlog on sovereignty and local AI
