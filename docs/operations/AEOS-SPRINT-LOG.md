@@ -455,6 +455,49 @@ Recommended Next Steps.
 `read_only: true` · `applied: false` · Aucun projet créé · Aucun secret · Aucun
 appel réseau · Aucun appel IA externe.
 
-**PR / Commit :** Sprint 4A — branch `sprint4a/build-rail-mvp`
+**PR / Commit :** PR #41 — mergé dans main (`6c5c598`)
 **Statut :** DONE — 1382 tests passés
 **Validation :** `uv run pytest` → 1382 passed. `aeos build plan` fonctionnel.
+
+---
+
+## Sprint 4B — Build Scaffold MVP
+
+**Objectif :** Ajouter `aeos build scaffold` pour générer un squelette minimal de
+gouvernance dans un dossier output explicitement fourni.
+Première commande write d'AEOS (`read_only: false`, `applied: true`).
+Aucun code applicatif généré. Aucun npm/pnpm/uv/docker lancé.
+
+**Livraisons :**
+
+- `src/aeos/build/scaffold.py` — `BuildScaffoldResult`, `ScaffoldedFile`,
+  `scaffold_build_project()`, `render_scaffold_files()`, `ensure_safe_output_directory()`,
+  `scaffold_result_to_dict()`
+- `src/aeos/build/__init__.py` — exports mis à jour (scaffold)
+- `src/aeos/cli.py` — sous-commande `build scaffold`
+- `tests/unit/test_build_scaffold.py` — 16 tests unitaires
+- `docs/features/AEOS-BUILD-RAIL.md` — Section 7 Build Scaffold ajoutée
+
+**Commandes ajoutées :**
+
+```bash
+aeos build scaffold --name <project> --type <type> --stack <stack> --output <dir>
+aeos build scaffold --name <project> --type <type> --stack <stack> --output <dir> --force
+aeos build scaffold --name <project> --type <type> --stack <stack> --output <dir> --json
+```
+
+**Fichiers générés (8) :**
+
+```
+README.md · ARCHITECTURE.md · .env.example · .gitignore · aeos.toml
+docs/DECISIONS.md · docs/SECURITY.md · docs/SOVEREIGNTY.md
+```
+
+**Garanties write :**
+Écriture uniquement dans `--output` · Aucun `.env` créé · Aucune valeur secrète ·
+`read_only: false` · `applied: true` · Aucun appel réseau · Aucun appel IA externe ·
+`--output` non vide sans `--force` → refus avec message d'erreur clair.
+
+**PR / Commit :** Sprint 4B — branch `sprint4b/build-scaffold-mvp`
+**Statut :** DONE — 1398 tests passés
+**Validation :** `uv run pytest` → 1398 passed. `aeos build scaffold` fonctionnel.

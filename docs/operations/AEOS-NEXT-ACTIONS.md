@@ -1,6 +1,6 @@
 # AEOS Next Actions
 
-**Version :** 2026-06-29  
+**Version :** 2026-06-30  
 **Auteur :** AEOS Operations  
 **Statut :** Document vivant — à mettre à jour après chaque session de travail
 
@@ -10,15 +10,16 @@
 
 | Élément | État |
 |---|---|
-| Branche `main` | `8410c28` — Sprint 3I mergé (PR #40) |
-| CI | Verte (1382 tests — sprint 4A local) |
-| AEOS CLI | `reclaim harden`, `memory list`, `memory show`, `memory compare`, `memory timeline`, `build plan` |
+| Branche `main` | `6c5c598` — Sprint 4A mergé (PR #41) |
+| CI | Verte (1398 tests — sprint 4B local) |
+| AEOS CLI | `reclaim harden`, `memory list`, `memory show`, `memory compare`, `memory timeline`, `build plan`, `build scaffold` |
 | Memory Write | Sprint 3F — mergé, stable |
 | Memory Read CLI | Sprint 3G — mergé dans main (PR #36) |
 | Memory Compare | Sprint 3H — mergé dans main (PR #38) |
 | Memory Compare Validation | Sprint 3H-1 — mergé dans main (PR #39) |
 | Memory Timeline | Sprint 3I — mergé dans main (PR #40) |
-| Build Rail MVP | Sprint 4A — **en attente de merge** (branch `sprint4a/build-rail-mvp`) |
+| Build Rail MVP | Sprint 4A — mergé dans main (PR #41) |
+| Build Scaffold MVP | Sprint 4B — **en attente de merge** (branch `sprint4b/build-scaffold-mvp`) |
 | `ma-mairie-digitale` | Untouched — projet client intact |
 | `.env` | Non lu, non tracké, non copié |
 
@@ -33,10 +34,11 @@ aeos memory show     --memory-dir <dir> --record <id>                   →  aff
 aeos memory compare  --memory-dir <dir> --left <id> --right <id>        →  compare deux records
 aeos memory timeline --memory-dir <dir> --project <name>                →  timeline du projet
 aeos build plan      --name <name> --type <type> --stack <stack>        →  plan d'architecture
+aeos build scaffold  --name <name> --type <type> --stack <stack> --output <dir>  →  scaffold governance
 ```
 
-Tous les modes `--json` sont disponibles. Tout est read-only. Aucun secret. Aucune DB.
-Sprint 4A (`build plan`) est sur la branche `sprint4a/build-rail-mvp` — PR en attente.
+Tous les modes `--json` sont disponibles. `build plan` est read-only. `build scaffold` écrit dans `--output` uniquement.
+Sprint 4B (`build scaffold`) est sur la branche `sprint4b/build-scaffold-mvp` — PR en attente.
 
 ---
 
@@ -60,7 +62,7 @@ aeos memory timeline --memory-dir <dir> --project <name> [--json]
 
 ### Priorité 3 — Sprint 4A : Build Rail MVP (DONE)
 
-**Statut :** Livré — branch `sprint4a/build-rail-mvp`, PR en attente de merge.
+**Statut :** Livré — mergé dans main (PR #41).
 
 ```bash
 aeos build plan --name <project> --type <type> --stack <stack> [--json]
@@ -69,17 +71,17 @@ aeos build plan --name <project> --type <type> --stack <stack> [--json]
 Types : `web-app` · `api` · `internal-tool`
 Stacks : `nextjs-supabase` · `nextjs-postgres` · `fastapi-postgres` · `generic`
 
-### Priorité 4 — Sprint 4B : Build Scaffold MVP
+### Priorité 4 — Sprint 4B : Build Scaffold MVP (DONE)
 
-**Objectif :** Générer la structure de dossiers et fichiers governance pour un
-nouveau projet AEOS-native.
+**Statut :** Livré — branch `sprint4b/build-scaffold-mvp`, PR en attente de merge.
 
 ```bash
-aeos build scaffold --name <project> --type <type> --stack <stack>
+aeos build scaffold --name <project> --type <type> --stack <stack> --output <dir> [--json] [--force]
 ```
 
-Génère dans un dossier vide : folder structure, governance files, .env.example,
-.gitignore, README.md, ARCHITECTURE.md, docs/DECISIONS.md.
+Génère dans `--output` : `README.md`, `ARCHITECTURE.md`, `.env.example`, `.gitignore`,
+`aeos.toml`, `docs/DECISIONS.md`, `docs/SECURITY.md`, `docs/SOVEREIGNTY.md`.
+Première commande write d'AEOS : `read_only: false`, `applied: true`.
 
 ---
 
@@ -172,3 +174,4 @@ uv run aeos memory show \
 | 2026-06-29 | Sprint 3H — Memory Compare livré (26 tests, `aeos memory compare`) |
 | 2026-06-30 | Sprint 3I — Memory Timeline livré (22 tests, `aeos memory timeline`) |
 | 2026-06-30 | Sprint 4A — Build Rail MVP livré (18 tests, `aeos build plan`) |
+| 2026-06-30 | Sprint 4B — Build Scaffold MVP livré (16 tests, `aeos build scaffold`) |

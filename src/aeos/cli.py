@@ -2499,3 +2499,70 @@ def build_plan_cmd(
     typer.echo("")
     typer.echo("Read-only — no project created, no files modified.")
     typer.echo("  read_only: true  ·  applied: false")
+
+
+# ---------------------------------------------------------------------------
+# build scaffold
+# ---------------------------------------------------------------------------
+
+
+@build_app.command("scaffold")
+def build_scaffold_cmd(
+    name: str = typer.Option(..., "--name", help="Project name."),
+    project_type: str = typer.Option(..., "--type", help="Project type."),
+    stack: str = typer.Option(..., "--stack", help="Technology stack."),
+    output: str = typer.Option(
+        ..., "--output", help="Directory to write scaffold files into."
+    ),
+    force: bool = typer.Option(
+        False, "--force", help="Overwrite non-empty output directory."
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Generate a governance scaffold for a new project (writes to --output)."""
+    from aeos.build.scaffold import scaffold_build_project, scaffold_result_to_dict
+
+    output_path = Path(output)
+
+    try:
+        result = scaffold_build_project(
+            name, project_type, stack, output_path, force=force
+        )
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+
+    if as_json:
+        typer.echo(json.dumps(scaffold_result_to_dict(result), indent=2))
+        return
+
+    typer.echo("")
+    typer.echo("── Build Scaffold ───────────────────────────────────────")
+    typer.echo("")
+    typer.echo("── Project Identity ─────────────────────────────────────")
+    typer.echo(f"  name:   {result.project_name}")
+    typer.echo(f"  type:   {result.project_type}")
+    typer.echo(f"  stack:  {result.stack}")
+    typer.echo("")
+    typer.echo("── Output Directory ─────────────────────────────────────")
+    typer.echo(f"  {result.output_directory}")
+    typer.echo("")
+    n = len(result.files_created)
+    typer.echo(f"── Files Created ({n}) " + "─" * max(0, 38 - len(str(n))))
+    for f in result.files_created:
+        typer.echo(f"  {f}")
+    if result.files_skipped:
+        typer.echo("")
+        typer.echo(f"── Files Skipped ({len(result.files_skipped)}) " + "─" * 36)
+        for f in result.files_skipped:
+            typer.echo(f"  {f}")
+    typer.echo("")
+    typer.echo("── Safety Guarantees ────────────────────────────────────")
+    for item in result.safety_guarantees:
+        typer.echo(f"  • {item}")
+    typer.echo("")
+    typer.echo("── Recommended Next Steps ───────────────────────────────")
+    for i, step in enumerate(result.recommended_next_steps, start=1):
+        typer.echo(f"  {i}. {step}")
+    typer.echo("")
+    typer.echo("  applied: true  ·  read_only: false")

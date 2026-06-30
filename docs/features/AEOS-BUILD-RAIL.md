@@ -1,7 +1,7 @@
 # AEOS Build Rail
 
-**Version :** Sprint 4A — 2026-06-30  
-**Statut :** MVP livré — `aeos build plan` disponible  
+**Version :** Sprint 4B — 2026-06-30  
+**Statut :** MVP livré — `aeos build plan` + `aeos build scaffold` disponibles  
 **Rail :** Build
 
 ---
@@ -192,44 +192,103 @@ Read-only — no project created, no files modified.
 
 ---
 
-## 7. Limites du MVP (Sprint 4A)
+## 7. Commande `aeos build scaffold`
 
-- `aeos build plan` produit un plan — il ne génère pas de fichiers.
-- Aucun code applicatif n'est généré.
-- Les stacks disponibles sont limitées à 4 (nextjs-supabase, nextjs-postgres,
-  fastapi-postgres, generic).
-- Les types sont limités à 3 (web-app, api, internal-tool).
-- La commande est statique — elle n'inspecte pas de projet existant.
+### Usage
+
+```bash
+aeos build scaffold --name <project_name> --type <project_type> --stack <stack> --output <dir>
+aeos build scaffold --name <project_name> --type <project_type> --stack <stack> --output <dir> --force
+aeos build scaffold --name <project_name> --type <project_type> --stack <stack> --output <dir> --json
+```
+
+### Exemple
+
+```bash
+aeos build scaffold --name civic-portal --type web-app --stack nextjs-supabase --output ./civic-portal
+```
+
+### Fichiers générés (8)
+
+| Fichier | Rôle |
+|---|---|
+| `README.md` | Présentation du projet avec identity, architecture summary |
+| `ARCHITECTURE.md` | Structure recommandée + décisions à compléter |
+| `.env.example` | Variables d'environnement avec placeholders — jamais de vraies valeurs |
+| `.gitignore` | Protection `.env`, Node, Python, OS, IDE |
+| `aeos.toml` | Configuration AEOS (`local_first = true`, `human_approval_required = true`) |
+| `docs/DECISIONS.md` | Log d'Architecture Decision Records (ADR) — template + checklist |
+| `docs/SECURITY.md` | Baseline sécurité du projet |
+| `docs/SOVEREIGNTY.md` | Baseline souveraineté — providers, local dev, exit strategy |
+
+### Garanties write
+
+| Garantie | Statut |
+|---|---|
+| Écriture uniquement dans `--output` | ✓ |
+| Aucun fichier `.env` créé — `.env.example` seulement | ✓ |
+| Aucune valeur secrète écrite | ✓ |
+| `read_only: false` dans la sortie JSON | ✓ |
+| `applied: true` dans la sortie JSON | ✓ |
+| Aucun appel réseau | ✓ |
+| Aucun appel IA externe | ✓ |
+| Aucun code applicatif généré | ✓ |
+| `--output` non vide sans `--force` → refus | ✓ |
+
+### Sortie JSON (`--json`)
+
+```json
+{
+  "command": "build scaffold",
+  "read_only": false,
+  "applied": true,
+  "project_name": "civic-portal",
+  "project_type": "web-app",
+  "stack": "nextjs-supabase",
+  "output_directory": "./civic-portal",
+  "files_created": ["README.md", "ARCHITECTURE.md", ".env.example", ...],
+  "files_skipped": [],
+  "safety_guarantees": [...],
+  "recommended_next_steps": [...]
+}
+```
 
 ---
 
-## 8. Étapes futures possibles
+## 8. Limites du MVP (Sprint 4A–4B)
+
+- `aeos build plan` produit un plan — il n'écrit aucun fichier.
+- `aeos build scaffold` génère uniquement des fichiers governance — aucun code applicatif.
+- Aucun `npm install`, `pnpm`, `uv init`, `docker-compose`, `supabase init` lancé.
+- Les stacks disponibles sont limitées à 4 (nextjs-supabase, nextjs-postgres,
+  fastapi-postgres, generic).
+- Les types sont limités à 3 (web-app, api, internal-tool).
+- Les commandes sont statiques — elles n'inspectent pas de projet existant.
+
+---
+
+## 9. Étapes futures possibles
 
 | Commande | Objectif |
 |---|---|
-| `aeos build scaffold` | Générer la structure de dossiers et fichiers governance |
 | `aeos build review` | Auditer un projet en cours de construction |
 | `aeos build generate` | Générer des composants avec contrôle humain |
 | `aeos build apply` | Appliquer une action avec gate humain explicite |
 
-Chaque étape future restera soumise aux invariants AEOS :
-- `read_only: true` par défaut
-- `applied: false` jusqu'à validation humaine explicite
-- Aucun secret lu ou affiché
-- Aucun appel frontier AI sans autorisation
-
 ---
 
-## 9. Architecture interne
+## 10. Architecture interne
 
 ```
 src/aeos/build/
   __init__.py        — exports publics
   planner.py         — BuildPlan, create_build_plan(), build_plan_to_dict()
+  scaffold.py        — BuildScaffoldResult, scaffold_build_project(), render_scaffold_files()
 
-src/aeos/cli.py      — commande aeos build plan
+src/aeos/cli.py      — commandes aeos build plan + aeos build scaffold
 tests/unit/
   test_build_planner.py  — 18 tests
+  test_build_scaffold.py — 16 tests
 ```
 
 ### Public API
@@ -237,16 +296,19 @@ tests/unit/
 ```python
 from aeos.build import (
     BuildPlan,
+    BuildScaffoldResult,
     VALID_TYPES,
     VALID_STACKS,
     create_build_plan,
     build_plan_to_dict,
+    scaffold_build_project,
+    scaffold_result_to_dict,
     validate_project_type,
     validate_stack,
 )
 
 plan = create_build_plan("civic-portal", "web-app", "nextjs-supabase")
-d = build_plan_to_dict(plan)
+result = scaffold_build_project("civic-portal", "web-app", "nextjs-supabase", Path("./out"))
 ```
 
 ---
