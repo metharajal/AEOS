@@ -642,3 +642,92 @@ hors du projet AEOS et hors de `ma-mairie-digitale`.
 **PR / Commit :** branch `sprint5a2/reclaim-recovery-real-validation`
 **Statut :** DONE
 **Validation :** Validation réelle exécutée, tous les checks verts, repos propres.
+
+---
+
+## Sprint 5B — Total Sovereign Recovery Vision
+
+**Objectif :** Élargir la vision AEOS de "reclaim audit/recovery plan" vers une doctrine complète de reprise totale souveraine.
+
+**Ce sprint ne modifie aucun code Python. Documentation stratégique uniquement.**
+
+### Vision élargie
+
+La vision AEOS passe de :
+> "AEOS audite et génère un plan de récupération"
+
+vers :
+> "AEOS accompagne un client depuis un projet généré, fragile ou dépendant jusqu'à un logiciel maîtrisé, sécurisé, migrable si nécessaire, maintenable, exploitable et développable dans la durée avec IA locale en priorité et IA frontière seulement par exception."
+
+### Doctrine centrale (confirmée)
+
+```
+AEOS Core guarantees.
+AEOS Agents reason.
+AEOS Memory learns.
+Humans validate.
+
+AEOS is not a chatbot.
+AEOS is not a blind autonomous agent.
+AEOS is a controlled agentic operating system for sovereign software recovery, continuation, and operation.
+```
+
+### Ce qui a été ajouté
+
+**`docs/strategy/AEOS-PRODUCT-VISION.md` — section 14 : Total Sovereign Recovery**
+
+- Promesse : *From generated prototype to sovereign software. / De prototype généré à logiciel souverain maîtrisé.*
+- Full recovery arc (12 phases : compréhension → secrets → architecture → gouvernance → RLS → tests → CI → local run → portabilité → migration → IA locale → exploitation souveraine)
+- Souveraineté progressive : `weak → partial → controlled → portable → sovereign`
+- 8 dimensions de souveraineté : code, data, secret, deployment, architecture, AI, knowledge, operational
+- Doctrine agentique réaffirmée : AEOS n'est pas un agent autonome sans contrôle
+
+**`docs/strategy/AEOS-PRODUCT-RAILS-AND-AGENTS.md` — sections 8, 9, 10**
+
+- Reclaim → Recover → Continue : l'arc de reprise standard documenté
+- Clarification : Reclaim / Recover / Continue / Migration / Operate
+- Section 8 : Agentic Operating Model — 12 agents AEOS avec scope et rails
+- Section 9 : AEOS Action Levels (Level 0–5) — du diagnostic vers l'exploitation continue
+- Section 10 : Total Recovery Stage Model — 10 stages avec 9 dimensions chacun :
+  - objectif, préconditions, actions, risques, preuves attendues, gates humains, rollback, MemoryRecord, agents
+- Mapping stage → agents
+
+**`docs/features/AEOS-RECLAIM-RECOVERY.md` — sections 13, 14, 15**
+
+- Section 13 : Total Recovery Scope — migration rules (8 règles non négociables)
+- Section 14 : Local AI First Development Continuation (8 règles permanentes)
+- Section 15 : Recovery Evidence — 8 types de preuves + chaîne complète de mesure
+
+**`docs/operations/AEOS-NEXT-ACTIONS.md`**
+
+- État mis à jour (main = `b4464dc`, 1420 tests, Sprint 5A mergé)
+- Roadmap Sprint 5B → 5I documentée
+- Sprint 5I : contrat UI — Paste URL / Express or Expert / Run Sovereignty Recovery / View roadmap / Prepare PRs / Continue with local AI
+
+**`docs/operations/AEOS-SPRINT-LOG.md`**
+
+- Cette entrée
+
+### Ce qui reste inchangé
+
+- Tous les rails existants (Build, Reclaim, Modernize, Migrate, Operate, Security, Sovereignty, Agents, Memory)
+- Toutes les commandes CLI existantes
+- Toutes les garanties read-only
+- La doctrine local-first / open-source-first / AI-local-first
+- Les 1420 tests
+
+### Invariants maintenus
+
+- Ne pas réduire AEOS à Reclaim
+- Ne pas présenter AEOS comme un agent autonome sans contrôle
+- Ne pas affaiblir les rails déjà documentés
+- Ne pas modifier le code Python ni les tests
+
+**Fichiers modifiés :** 5 (documentation uniquement)
+**Lignes ajoutées :** ~400
+**Commandes CLI ajoutées :** 0
+**Tests ajoutés :** 0
+**Statut :** DONE (documentation) — implémentation dans Sprints 5C–5I
+
+**PR / Commit :** branch `sprint5b/total-sovereign-recovery-vision`
+**Validation :** `uv run ruff check .` · `uv run mypy src` · `uv run pytest` — tous verts (aucun code modifié)

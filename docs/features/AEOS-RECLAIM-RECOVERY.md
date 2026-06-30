@@ -372,8 +372,90 @@ PRs:     7 in roadmap
 
 ---
 
+## 13. Total Recovery Scope
+
+`aeos reclaim recovery plan` is the entry point to a larger arc. AEOS can accompany a project through the full recovery — from audit to sovereign operation.
+
+**AEOS does not stop at scanning a project.** AEOS accompanies until the project is:
+
+- understood (architecture documented, stack mapped, unknown zones identified);
+- secured (secrets rotated, .gitignore verified, .env.example complete);
+- governed (DECISIONS.md, SECURITY.md, SOVEREIGNTY.md, aeos.toml in place);
+- tested (smoke tests added, test baseline established);
+- CI-gated (quality gate pipeline active, branch protection on main);
+- locally runnable (local run documented, Supabase local configured);
+- portable (Dockerfile present, migrations versioned, deployment reversible);
+- migratable if necessary (backup, dry-run, rollback, human gate);
+- operable with local AI continuation (local model configured, AI workflow established).
+
+### Migration rules
+
+AEOS can accompany migrations — but never silently.
+
+| Rule | Enforcement |
+|---|---|
+| No automatic apply | Every migration step requires explicit human confirmation before execution |
+| Backup mandatory | No migration step executes without a verified backup |
+| Dry-run mandatory | Migration SQL or script is validated in dry-run before live execution |
+| Rollback plan mandatory | A defined rollback path exists before any destructive step is applied |
+| Human validation explicit | Human reviews the plan, confirms the dry-run result, approves the apply |
+| Post-migration tests | Tests run after migration before declaring success |
+| MemoryRecord after operation | A memory record is created: backup status, dry-run result, tests passed, human gate |
+| No sensitive data to frontier AI | Migration plans and SQL proposals are generated locally — never sent to frontier AI |
+
+---
+
+## 14. Local AI First Development Continuation
+
+Once a project is recovered, development continues with local AI by default.
+
+| Rule | Description |
+|---|---|
+| **Local AI by default** | All routine engineering tasks (code review, test generation, refactoring, documentation) use local models |
+| **Frontier by exception** | Frontier AI is used only when local AI is demonstrably insufficient, with explicit human approval |
+| **Filtered context** | Context sent to any AI is filtered: no secrets, no credentials, no sensitive data |
+| **Never `.env`** | Environment files are never passed to any AI, local or frontier |
+| **Never secrets** | API keys, tokens, passwords, connection strings are never in AI context |
+| **Never customer data** | PII, financial data, health data, citizen data are never in AI context |
+| **Never sensitive DB dumps** | Database exports containing real data are never in AI context |
+| **Human validation before external send** | If any frontier escalation is considered, human reviews the filtered context before it is sent |
+
+This policy applies permanently — during recovery, during continuation, and during operation. It is not a phase-specific rule. It is a permanent invariant.
+
+---
+
+## 15. Recovery Evidence
+
+Every recovery step must produce verifiable evidence. Evidence is the proof that recovery is real, not claimed.
+
+| Evidence type | What it proves |
+|---|---|
+| **Files added** | New governance or infrastructure files are present and committed in the repo |
+| **Tests passed** | The change did not break existing functionality |
+| **PR created or merged** | The change was reviewed and human-approved before landing on main |
+| **Risk reduced** | The AEOS audit shows improvement (status, critical count, control level) |
+| **MemoryRecord created** | AEOS recorded the event with date, project name, and findings |
+| **Timeline updated** | `aeos memory timeline` shows measurable progression between audits |
+| **Human validation recorded** | An ADR or PR comment documents who validated what and when |
+| **Rollback documented** | If a destructive step was applied, the rollback path is documented in writing |
+
+> Evidence is not optional. A recovery step without evidence is not a recovery step — it is a guess.
+
+The complete evidence chain for a recovery stage:
+
+```
+aeos reclaim harden → MemoryRecord (before)
+[recovery actions applied in PR]
+aeos reclaim harden → MemoryRecord (after)
+aeos memory compare --left <before> --right <after>  → delta
+aeos memory timeline --project <name>                → progression
+```
+
+---
+
 ## Voir aussi
 
 - [`docs/features/AEOS-RECLAIM-HARDEN.md`](AEOS-RECLAIM-HARDEN.md)
 - [`docs/features/AEOS-BUILD-RAIL.md`](AEOS-BUILD-RAIL.md)
 - [`docs/strategy/AEOS-PRODUCT-RAILS-AND-AGENTS.md`](../strategy/AEOS-PRODUCT-RAILS-AND-AGENTS.md)
+- [`docs/strategy/AEOS-PRODUCT-VISION.md`](../strategy/AEOS-PRODUCT-VISION.md) — section 14 : Total Sovereign Recovery

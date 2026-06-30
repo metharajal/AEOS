@@ -10,8 +10,8 @@
 
 | Élément | État |
 |---|---|
-| Branche `main` | `c4b4798` — Sprint 4B-1 mergé (PR #43) |
-| CI | Verte (1420 tests — sprint 5A local) |
+| Branche `main` | `b4464dc` — Sprint 5A-2 mergé (PR #46) |
+| CI | Verte (1420 tests) |
 | AEOS CLI | `reclaim harden`, `reclaim recovery plan`, `memory list`, `memory show`, `memory compare`, `memory timeline`, `build plan`, `build scaffold` |
 | Memory Write | Sprint 3F — mergé, stable |
 | Memory Read CLI | Sprint 3G — mergé dans main (PR #36) |
@@ -20,8 +20,10 @@
 | Build Rail MVP | Sprint 4A — mergé dans main (PR #41) |
 | Build Scaffold MVP | Sprint 4B — mergé dans main (PR #42) |
 | Build Scaffold Validation | Sprint 4B-1 — mergé dans main (PR #43) |
-| Recovery Plan MVP | Sprint 5A — **en attente de merge** (branch `sprint5a/reclaim-recovery-plan`) |
-| `ma-mairie-digitale` | Untouched — projet client intact |
+| Recovery Plan MVP | Sprint 5A — **mergé dans main** (PR #44 + #45) |
+| Recovery Real-World Validation | Sprint 5A-2 — **mergé dans main** (PR #46) |
+| Total Sovereign Recovery Vision | Sprint 5B — **en cours** (branch `sprint5b/total-sovereign-recovery-vision`) |
+| `ma-mairie-digitale` governance | Sprint 5A (client) — PR #2 mergé dans main · PR #3 open (fix Lovable disconnect task) |
 | `.env` | Non lu, non tracké, non copié |
 
 ---
@@ -44,57 +46,98 @@ Sprint 5A (`reclaim recovery plan`) est sur la branche `sprint5a/reclaim-recover
 
 ---
 
-## 3. Prochains sprints recommandés
+## 3. Roadmap Sprint 5B — 5I
 
-### Priorité 1 — Sprint 3H : Memory Compare (DONE)
+> Priorité immédiate : construire le modèle standard de reprise totale avant toute migration réelle.
 
-**Statut :** Livré et mergé — PR #38 (`401d485`).
+La vision Total Sovereign Recovery (Sprint 5B) pose la doctrine. Les sprints suivants l'implémentent progressivement.
 
----
+### Sprint 5B — Total Sovereign Recovery Vision (en cours)
 
-### Priorité 2 — Sprint 3I : Memory Timeline (DONE)
+**Objectif :** Mettre à jour la documentation stratégique AEOS pour intégrer la vision Total Sovereign Recovery, le modèle agentique, les niveaux d'action, et le stage model complet.
 
-**Statut :** Livré — branch `sprint3i/memory-timeline-mvp`, PR en attente de merge.
-
-```bash
-aeos memory timeline --memory-dir <dir> --project <name> [--json]
-```
+**Documents mis à jour :** `AEOS-PRODUCT-VISION.md`, `AEOS-PRODUCT-RAILS-AND-AGENTS.md`, `AEOS-RECLAIM-RECOVERY.md`, `AEOS-NEXT-ACTIONS.md`, `AEOS-SPRINT-LOG.md`
 
 ---
 
-### Priorité 3 — Sprint 4A : Build Rail MVP (DONE)
+### Sprint 5C — Total Recovery Stage Model
 
-**Statut :** Livré — mergé dans main (PR #41).
+**Objectif :** Implémenter le modèle de stages comme structure de données AEOS.
 
-```bash
-aeos build plan --name <project> --type <type> --stack <stack> [--json]
-```
-
-Types : `web-app` · `api` · `internal-tool`
-Stacks : `nextjs-supabase` · `nextjs-postgres` · `fastapi-postgres` · `generic`
-
-### Priorité 4 — Sprint 4B : Build Scaffold MVP (DONE)
-
-**Statut :** Livré — branch `sprint4b/build-scaffold-mvp`, PR en attente de merge.
-
-```bash
-aeos build scaffold --name <project> --type <type> --stack <stack> --output <dir> [--json] [--force]
-```
-
-Génère dans `--output` : `README.md`, `ARCHITECTURE.md`, `.env.example`, `.gitignore`,
-`aeos.toml`, `docs/DECISIONS.md`, `docs/SECURITY.md`, `docs/SOVEREIGNTY.md`.
-Première commande write d'AEOS : `read_only: false`, `applied: true`.
+- `src/aeos/reclaim/stages.py` — `RecoveryStage`, `StageResult`, `StagePrecondition`
+- `aeos reclaim stage status --path <project>` — état de chaque stage pour un projet
+- Liaison avec MemoryRecord : chaque stage completed crée un record
+- Tests : 20+ tests unitaires
 
 ---
 
-### Horizon — autres priorités mémoire
+### Sprint 5D — Project Recover Orchestrator
 
-| Sprint | Objectif |
-|---|---|
-| Memory pour Security/Supabase | Wirer `--memory-dir` sur les autres rails |
-| Memory validate | `aeos memory validate --record <id>` — marquer comme validé humainement |
-| Memory note | `aeos memory note --record <id> --text "..."` — annoter un record |
-| Memory search | Recherche dans les records par field ou texte libre |
+**Objectif :** Orchestrateur de reprise — exécute les stages dans l'ordre avec gates humains.
+
+- `aeos recover --path <project> [--stage <stage_name>]` — lance un stage de récupération
+- Gate humain avant chaque action (Level 3+)
+- Evidence produite après chaque stage
+- MemoryRecord créé et timeline mise à jour
+
+---
+
+### Sprint 5E — Governance PR Generator
+
+**Objectif :** Générer automatiquement les fichiers de gouvernance stage_1 sous forme de PR.
+
+- `aeos recover governance --path <project> --output <dir>` — génère les 7 fichiers
+- Basé sur le résultat de `reclaim recovery plan`
+- `--dry-run` pour prévisualisation sans écriture
+- Tests : 15+ tests unitaires
+
+---
+
+### Sprint 5F — Local AI Development Policy Engine
+
+**Objectif :** Moteur de politique IA locale — configurer, valider et appliquer la politique IA d'un projet.
+
+- `aeos ai policy check --path <project>` — vérifie la conformité avec la politique IA
+- `aeos ai policy generate --path <project>` — génère docs/AI-DEVELOPMENT-POLICY.md
+- Validation du contexte avant envoi (filtrage des secrets, PII, données sensibles)
+- Tests : 15+ tests unitaires
+
+---
+
+### Sprint 5G — Migration Readiness Plan
+
+**Objectif :** Générer un plan de migration complet (stage_7) avec backup, dry-run et rollback.
+
+- `aeos migrate plan --path <project> --from <source> --to <target>` — plan read-only
+- Vérification des préconditions (backup, portabilité, tests)
+- Rollback path documenté automatiquement
+- Tests : 15+ tests unitaires
+
+---
+
+### Sprint 5H — Multi-Project Sovereign Recovery Validation
+
+**Objectif :** Valider la chaîne complète de reprise sur plusieurs projets clients.
+
+- Exécution de stage_0 à stage_4 sur au moins 2 projets distincts
+- Comparaison before/after via `aeos memory compare`
+- Documentation dans `docs/features/AEOS-RECLAIM-RECOVERY.md`
+
+---
+
+### Sprint 5I — AEOS Local Server / UI Contract
+
+**Objectif :** Définir le contrat d'interface pour l'interface graphique AEOS future.
+
+L'interface graphique permettra de :
+1. Coller l'URL d'un repository
+2. Choisir Express (automatique) ou Expert (stage par stage)
+3. Lancer le Sovereignty Recovery
+4. Visualiser la roadmap des PRs
+5. Préparer les PRs avec review humaine
+6. Continuer le développement avec l'IA locale
+
+Ce sprint documente le contrat API/UI sans implémenter le serveur.
 
 ---
 
@@ -177,3 +220,6 @@ uv run aeos memory show \
 | 2026-06-30 | Sprint 3I — Memory Timeline livré (22 tests, `aeos memory timeline`) |
 | 2026-06-30 | Sprint 4A — Build Rail MVP livré (18 tests, `aeos build plan`) |
 | 2026-06-30 | Sprint 4B — Build Scaffold MVP livré (16 tests, `aeos build scaffold`) |
+| 2026-06-30 | Sprint 5A — Recovery Plan MVP mergé (22 tests, PR #44 + #45) |
+| 2026-06-30 | Sprint 5A-2 — Real-World Validation mergée (PR #46), 1420 tests |
+| 2026-06-30 | Sprint 5B — Total Sovereign Recovery Vision lancé — doctrine, stage model, agentic model |
