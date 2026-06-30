@@ -2854,3 +2854,84 @@ def reclaim_stage_show_cmd(
         typer.echo(f"    - {agent}")
     typer.echo("")
     typer.echo("  read_only: true  ·  applied: false")
+
+
+# ---------------------------------------------------------------------------
+# reclaim stage plan
+# ---------------------------------------------------------------------------
+
+
+@reclaim_stage_app.command("plan")
+def reclaim_stage_plan_cmd(
+    done: str = typer.Option(
+        "",
+        "--done",
+        help="Comma-separated completed stage IDs (e.g. stage_0_baseline,stage_1_governance).",  # noqa: E501
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Build a structured staged recovery plan from completed stages (read-only)."""
+    from aeos.reclaim.planner import (
+        build_staged_recovery_plan,
+        staged_plan_to_dict,
+        validate_done_ids,
+    )
+
+    done_ids = [s.strip() for s in done.split(",") if s.strip()] if done else []
+
+    unknown = validate_done_ids(done_ids)
+    if unknown:
+        for uid in unknown:
+            typer.echo(f"Error: unknown stage ID '{uid}'.", err=True)
+        typer.echo(
+            "  Run 'aeos reclaim stage list' to see all valid stage IDs.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    plan = build_staged_recovery_plan(done_ids=done_ids)
+
+    if as_json:
+        typer.echo(json.dumps(staged_plan_to_dict(plan), indent=2))
+        return
+
+    typer.echo("")
+    typer.echo("── Staged Recovery Plan " + "─" * 36)
+    typer.echo(
+        f"  Done: {len(plan.stages_done)}"
+        f"  ·  Ready: {len(plan.stages_ready)}"
+        f"  ·  Blocked: {len(plan.stages_blocked)}"
+        f"  ·  read_only: true  ·  applied: false"
+    )
+    typer.echo("")
+
+    if plan.stages_done:
+        typer.echo("  DONE")
+        for item in plan.items:
+            if item.status == "done":
+                typer.echo(f"    ✓ {item.stage_id:<42} {item.stage_name}")
+        typer.echo("")
+
+    if plan.stages_ready:
+        typer.echo("  READY")
+        for item in plan.items:
+            if item.status == "ready":
+                typer.echo(f"    → {item.stage_id:<42} {item.stage_name}")
+                if item.recommended_first_action:
+                    typer.echo(f"      First action: {item.recommended_first_action}")
+        typer.echo("")
+
+    if plan.stages_blocked:
+        typer.echo("  BLOCKED")
+        for item in plan.items:
+            if item.status == "blocked":
+                missing = ", ".join(item.missing_prerequisites)
+                typer.echo(f"    ✗ {item.stage_id:<42} [needs: {missing}]")
+        typer.echo("")
+
+    if plan.next_stage_id:
+        typer.echo(f"  Next stage:  {plan.next_stage_id}")
+    if plan.next_action:
+        typer.echo(f"  Next action: {plan.next_action}")
+    typer.echo("")
+    typer.echo("  read_only: true  ·  applied: false")

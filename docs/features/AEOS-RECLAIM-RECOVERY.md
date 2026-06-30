@@ -526,6 +526,128 @@ d = recovery_stage_to_dict(stage)    # dict[str, object] — JSON-serializable
 
 ---
 
+## 17. Recovery Planner (Sprint 5D)
+
+Le Recovery Planner transforme le registre des 10 stages en un plan structuré selon les stages déjà complétés.
+Implémenté dans `src/aeos/reclaim/planner.py`. Read-only. Aucune mutation. Aucune exécution. Aucun write MemoryRecord.
+
+### Concept
+
+Entrée : une liste d'IDs de stages complétés (`done_ids`)
+Sortie : `StagedRecoveryPlan` — chaque stage classé `done | ready | blocked`, avec la prochaine action recommandée.
+
+### Modèles
+
+```python
+@dataclass
+class StageAssessment:
+    stage_id: str
+    stage_name: str
+    status: str                      # "done" | "ready" | "blocked"
+    missing_prerequisites: list[str] # [] si done ou ready
+    recommended_first_action: str    # actions[0] si ready/blocked, "" si done
+    human_gate: str
+    memory_record_type: str
+
+@dataclass
+class StagedRecoveryPlan:
+    project_path: str
+    read_only: bool                  # toujours True
+    applied: bool                    # toujours False
+    stages_done: list[str]
+    stages_ready: list[str]
+    stages_blocked: list[str]
+    recommended_sequence: list[str]  # done → ready → blocked
+    next_stage_id: str | None
+    next_action: str | None
+    items: list[StageAssessment]
+    total: int                       # toujours 10
+```
+
+### Logique de statut
+
+| Condition | Statut |
+|-----------|--------|
+| `stage.id` dans `done_ids` | `done` |
+| Tous les prérequis dans `done_ids`, stage non complété | `ready` |
+| Au moins un prérequis absent de `done_ids` | `blocked` |
+
+### Commandes CLI
+
+```bash
+# Projet vierge (tous les stages pending)
+aeos reclaim stage plan
+
+# Projet partiellement avancé
+aeos reclaim stage plan --done stage_0_baseline,stage_1_governance
+
+# Sortie JSON
+aeos reclaim stage plan --done stage_0_baseline --json
+
+# ID inconnu → exit 1
+aeos reclaim stage plan --done stage_99_fake   # Error: unknown stage ID
+```
+
+### Sortie texte (exemple avec stage_0 complété)
+
+```
+── Staged Recovery Plan ────────────────────────────────────────────────
+  Done: 1  ·  Ready: 1  ·  Blocked: 8  ·  read_only: true  ·  applied: false
+
+  DONE
+    ✓ stage_0_baseline                           Baseline Assessment
+
+  READY
+    → stage_1_governance                         Governance Documentation
+      First action: Create ARCHITECTURE.md
+
+  BLOCKED
+    ✗ stage_2_secrets_env                        [needs: stage_1_governance]
+    ...
+
+  Next stage:  stage_1_governance
+  Next action: Create ARCHITECTURE.md
+
+  read_only: true  ·  applied: false
+```
+
+### API Python
+
+```python
+from aeos.reclaim import (
+    StageAssessment,
+    StagedRecoveryPlan,
+    assess_stage,
+    build_staged_recovery_plan,
+    staged_plan_to_dict,
+    validate_done_ids,
+)
+
+# Valider les IDs avant de planifier
+unknown = validate_done_ids(["stage_0_baseline", "stage_99_fake"])
+# → ["stage_99_fake"]
+
+# Construire le plan
+plan = build_staged_recovery_plan(
+    done_ids=["stage_0_baseline", "stage_1_governance"],
+    project_path="/path/to/project",
+)
+
+# Sérialiser
+d = staged_plan_to_dict(plan)  # dict[str, object] — JSON-serializable
+```
+
+### Garanties read-only
+
+- Aucun accès filesystem.
+- Aucune base de données contactée.
+- Aucun secret lu ou affiché.
+- Aucun MemoryRecord créé ou modifié.
+- Sortie toujours `read_only: true · applied: false`.
+- `validate_done_ids` rejette tout ID inconnu → exit 1 en CLI.
+
+---
+
 ## Voir aussi
 
 - [`docs/features/AEOS-RECLAIM-HARDEN.md`](AEOS-RECLAIM-HARDEN.md)

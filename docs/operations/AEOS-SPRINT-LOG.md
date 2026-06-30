@@ -784,3 +784,70 @@ AEOS is a controlled agentic operating system for sovereign software recovery, c
 
 **PR / Commit :** branch `sprint5c/total-recovery-stage-model`
 **Validation :** `uv run ruff check .` · `uv run mypy src` · `uv run pytest` — tous verts
+
+---
+
+## Sprint 5D — Recovery Planner
+
+**Date :** 2026-06-30
+**Branche :** `sprint5d/recovery-planner`
+**Objectif :** Recovery Planner read-only — transforme le registre des 10 stages en plan structuré selon les stages complétés.
+
+### Ce qui a été ajouté
+
+**Python (read-only, aucune mutation) :**
+
+- `src/aeos/reclaim/planner.py` — `StageAssessment` dataclass, `StagedRecoveryPlan` dataclass, 4 fonctions pures :
+  - `validate_done_ids(done_ids)` — retourne les IDs inconnus (vide = tous valides)
+  - `assess_stage(stage, done_set)` — évalue le statut d'un stage (`done | ready | blocked`)
+  - `build_staged_recovery_plan(done_ids, project_path)` — construit le plan complet
+  - `staged_plan_to_dict(plan)` — sérialise en dict JSON-compatible
+- `src/aeos/reclaim/__init__.py` — 6 nouveaux imports et exports dans `__all__` (RUF022 trié)
+- `src/aeos/cli.py` — commande `aeos reclaim stage plan [--done <ids>] [--json]`
+
+**Tests :**
+
+- `tests/unit/test_reclaim_planner.py` — 55 tests couvrant :
+  - `validate_done_ids` (vide, tous valides, inconnus)
+  - `assess_stage` (done, ready, blocked, prereqs partiels, human_gate, memory_record_type)
+  - `build_staged_recovery_plan` (structure, empty done, partial done, all done, ordre)
+  - `staged_plan_to_dict` (clés, read_only, applied, JSON-serializable, item keys)
+  - CLI `stage plan` (no args, text output, JSON, --done virgule, exit 1 sur inconnu)
+
+**Documentation :**
+
+- `docs/features/AEOS-RECLAIM-RECOVERY.md` — section 17 : Recovery Planner
+- `docs/operations/AEOS-SPRINT-LOG.md` — cette entrée
+
+### Décisions Sprint 5D
+
+| Décision | Choix | Raison |
+|----------|-------|--------|
+| IDs inconnus dans `--done` | exit 1 strict | Cohérence avec `stage show --id <unknown>` |
+| Format `--done` | virgule `stage_0,stage_1` | Compact, copier-coller facile |
+| Nom fichier | `planner.py` | Court ; "staged" vit dans le dataclass |
+
+### Périmètre strict respecté
+
+| Dans le scope | Hors scope |
+|---------------|------------|
+| Modèles Python typés | Exécution de stages |
+| Logique de statut pure | Mutation de MemoryRecord |
+| CLI read-only plan | Orchestrateur ou scheduler |
+| Tests unitaires | Accès filesystem projet |
+| Documentation minimale | Appel réseau ou secret |
+
+### Invariants maintenus
+
+- `read_only: true · applied: false` dans toutes les sorties CLI
+- Aucun filesystem lu — plan calculé depuis le registre en mémoire
+- Aucun `.env` lu, aucune DB contactée, aucun secret affiché
+- Tous les checks verts : `ruff`, `mypy`, `pytest`
+
+**Fichiers modifiés :** 6 (2 Python nouveaux + 2 Python modifiés + 2 docs)
+**Tests ajoutés :** 55
+**Commandes CLI ajoutées :** 1 (`stage plan`)
+**Statut :** DONE
+
+**PR / Commit :** branch `sprint5d/recovery-planner`
+**Validation :** `uv run ruff check .` · `uv run mypy src` · `uv run pytest` — tous verts
