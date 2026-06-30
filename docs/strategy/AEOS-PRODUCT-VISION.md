@@ -805,6 +805,94 @@ It is the number of engineering teams who can truthfully say:
 
 ---
 
+## 14. Total Sovereign Recovery
+
+### The promise
+
+> **From generated prototype to sovereign software.**
+> *De prototype généré à logiciel souverain maîtrisé.*
+
+AEOS does not stop at:
+
+- scanning a project;
+- auditing findings;
+- generating a report;
+- applying a one-off fix.
+
+AEOS accompanies a client from a generated, fragile, or dependent project all the way to software that is mastered, secured, migratable when necessary, maintainable, operable, and developable over time — with local AI by default, frontier AI by exception only.
+
+The full recovery arc covers:
+
+| Phase | What AEOS provides |
+|---|---|
+| Understanding | Stack inspection, architecture map, zones of control and unknown |
+| Secret sovereignty | Secret exposure detection, .gitignore verification, rotation plan |
+| Architecture documentation | ARCHITECTURE.md, aeos.toml, dependency map |
+| Governance | DECISIONS.md, SECURITY.md, SOVEREIGNTY.md, AI policy |
+| Database / RLS hardening | RLS policy analysis, SQL proposals, human review gates |
+| Testing | Smoke tests, test baseline, regression safety net |
+| CI / CD | Quality gate pipeline, branch protection, CI wiring |
+| Local execution | Local run documentation, Dockerfile, docker-compose |
+| Portability | Schema versioning, migration export, reversible deployment |
+| Migration (when necessary) | Backup → dry-run → rollback plan → human validation → tests |
+| Local AI continuation | Local-first development, filtered context, human approval gates |
+| Sovereign operation | Continuous audit, drift detection, periodic AEOS reports |
+
+---
+
+### Progressive sovereignty
+
+> Sovereignty is a staged recovery process, not a single action.
+
+A project does not become sovereign in one step. AEOS defines a progressive maturity model:
+
+| Level | Label | What it means |
+|---|---|---|
+| `weak` | Fragile | No documentation, exposed secrets, no portability, no tests |
+| `partial` | Partial | Some documentation, secrets addressed, limited portability |
+| `controlled` | Controlled | Governance in place, secrets rotated, RLS hardened, CI active |
+| `portable` | Portable | Local run possible, Dockerfile present, migrations versioned |
+| `sovereign` | Sovereign | Full data control, exit strategies defined, local AI running, periodic audits active |
+
+The target is always `sovereign`. The path is always progressive. No single step achieves sovereignty — every stage moves the project forward on the maturity axis.
+
+---
+
+### Dimensions of sovereignty
+
+| Dimension | What it covers |
+|---|---|
+| **Code sovereignty** | Code is readable, owned, and maintainable without the originating platform |
+| **Data sovereignty** | Data is controlled, exportable, and hosted on infrastructure you choose |
+| **Secret sovereignty** | No credentials exist in Git history; rotation policy is active |
+| **Deployment sovereignty** | The project is deployable without a specific cloud account or third-party CI |
+| **Architecture sovereignty** | Every architectural decision is documented and reversible |
+| **AI sovereignty** | No frontier AI is used without explicit approval; local AI handles routine tasks |
+| **Knowledge sovereignty** | Architecture, decisions, and history are documented and human-readable |
+| **Operational sovereignty** | The team can audit, maintain, and evolve the product without external dependency |
+
+---
+
+### AEOS is not a chatbot. AEOS is not a blind autonomous agent.
+
+> AEOS is a controlled agentic operating system for sovereign software recovery, continuation, and operation.
+
+> AEOS Core guarantees.
+> AEOS Agents reason.
+> AEOS Memory learns.
+> Humans validate.
+
+This doctrine applies equally during recovery, continuation, and operation:
+
+- Agents propose actions — humans decide which to apply.
+- Every sensitive step has a human gate.
+- Every completed step produces evidence.
+- Memory records what was validated, not what was inferred.
+
+AEOS is not Reclaim only. Reclaim is the entry point. Total Sovereign Recovery is the destination.
+
+---
+
 **Vision finale :**
 
 > AEOS creates, reclaims, modernizes, migrates, evolves, and operates software:

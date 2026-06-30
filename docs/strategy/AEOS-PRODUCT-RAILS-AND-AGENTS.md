@@ -37,6 +37,21 @@ The reclaim capability is one rail among nine. It is not the identity of AEOS.
 | Cross-cutting task execution with AI | Agents Rail |
 | Cross-cutting project knowledge and audit history | Memory Rail |
 
+### Reclaim → Recover → Continue — the standard recovery arc
+
+When a project needs to be recovered, AEOS follows a natural three-phase arc:
+
+- **Reclaim**: understand and audit the existing project — control map, generator detection, risk classification, exit options. Read-only. Produces evidence.
+- **Recover**: take sovereign control — secrets rotated, governance documented, RLS hardened, tests added, CI active, portability established. Each step is a PR with human approval.
+- **Continue**: resume development with AI agents under controlled conditions — local AI first, frontier by exception, branch + PR discipline enforced.
+
+Related phases that extend the arc:
+
+- **Migration**: possible only with backup, dry-run, rollback plan, and explicit human validation at each step. Never applied silently.
+- **Operate**: maintain sovereignty over time — continuous audit, drift detection, periodic AEOS reports, Memory timeline.
+
+These phases are not linear for all projects. A project may enter at any stage. The arc defines the standard path for AI-generated or fragile projects under AEOS recovery.
+
 ---
 
 ## 2. The Nine Product Rails
@@ -448,10 +463,263 @@ Agents propose. Humans decide. Memory records what was validated. The loop is al
 
 ---
 
+## 8. Agentic Operating Model
+
+### AEOS is agentic by design.
+
+Agents are not optional features. They are the execution model of AEOS. Each agent has a defined scope, reads before it writes, produces evidence, and operates within the invariants enforced by AEOS Core.
+
+### Agent principles
+
+- **Agents are specialized.** No agent has a general mandate. Each is scoped to a domain.
+- **Agents do not bypass AEOS Core.** Core invariants (`read_only`, no secrets, no database connections) cannot be overridden by agent behavior.
+- **Agents do not access secrets by default.** Secret values are never passed to any agent.
+- **Agents do not call frontier AI without approval.** Local AI is the default. Frontier requires explicit human authorization.
+- **Agents do not apply migrations silently.** Every database change requires backup, dry-run, and human validation before apply.
+- **Agents produce evidence.** Every agent action is logged. Every step produces a verifiable artifact.
+- **Humans validate sensitive steps.** The human is always in the loop for destructive or irreversible operations.
+
+### AEOS Agents
+
+| Agent | Scope | Primary rail(s) |
+|---|---|---|
+| **Intake Agent** | Initial project intake: identify project type, generator, current state | Reclaim |
+| **Reclaim Agent** | Full project audit: control map, exit options, risk classification | Reclaim |
+| **Security Agent** | Secret detection, Git history scan, .gitignore, .env.example — read-only | Security, Reclaim |
+| **Sovereignty Agent** | Dependency mapping, portability scoring, exit strategy definition | Sovereignty, Reclaim |
+| **Database/RLS Agent** | Schema analysis, RLS inspection, SQL proposals — never applies silently | Reclaim, Migrate |
+| **Recovery Agent** | Recovery PR roadmap generation, governance file creation | Reclaim, Recover |
+| **Migration Agent** | Migration plan, backup verification, dry-run, rollback path — human gated | Migrate |
+| **Local AI Agent** | Routes tasks to local models, manages context filtering | All |
+| **Frontier AI Escalation Agent** | Manages escalation to frontier AI with context stripping and human approval | All |
+| **PR Agent** | Branch creation, commit, PR description, diff review | All |
+| **Memory Agent** | Stores validated audit results, corrections, and decisions locally | Memory |
+| **Operate Agent** | Continuous audit, drift detection, periodic reports | Operate |
+
+---
+
+## 9. AEOS Action Levels
+
+Every AEOS operation belongs to one of six action levels. Higher levels require stronger human approval gates.
+
+| Level | Name | Description | Human gate |
+|---|---|---|---|
+| **Level 0** | Diagnose | Read-only inspection. No modification, no network, no secret access. | None — fully autonomous |
+| **Level 1** | Plan | Generate a structured plan or roadmap. Read-only. Output is a document. | Human reviews plan before proceeding |
+| **Level 2** | Prepare | Generate files (docs, governance, scripts) for human review. Not applied yet. | Human reviews output before merge |
+| **Level 3** | Propose PR | Create a branch, commit, and open a PR. Human merges. | Human merges the PR |
+| **Level 4** | Execute with approval | Apply a migration, rotation, or configuration change. Requires explicit confirmation. | Explicit human confirmation required |
+| **Level 5** | Operate continuously | Monitor, audit, and report on an ongoing basis. Escalates Level 4 actions for approval. | Human reviews periodic reports |
+
+All current AEOS CLI commands operate at Level 0–3. Level 4+ requires explicit human confirmation before any action is applied. `applied: false` is the default for all Level 0–2 commands.
+
+---
+
+## 10. Total Recovery Stage Model
+
+The standard recovery arc for an AI-generated or fragile project follows ten ordered stages. Each stage has defined preconditions, actions, expected evidence, human gates, rollback, and a MemoryRecord.
+
+**Stage sequence:**
+
+```
+stage_0_baseline
+stage_1_governance
+stage_2_secrets_env
+stage_3_database_rls
+stage_4_tests_ci
+stage_5_local_run
+stage_6_portability
+stage_7_migration_readiness
+stage_8_local_ai_continuation
+stage_9_sovereign_operating_mode
+```
+
+Stages are not strictly linear. A project may enter recovery at any stage. Stages 0 and 1 are always mandatory. Stage 7 (migration) is only entered if a migration decision has been made.
+
+---
+
+### stage_0_baseline
+
+| Dimension | Value |
+|---|---|
+| **Objectif** | Understand the current state: stack, providers, generators, risks, control level |
+| **Préconditions** | Git access to the project (read-only) |
+| **Actions** | `aeos reclaim inspect`, `aeos reclaim harden`, `aeos reclaim recovery plan` |
+| **Risques** | Misidentified generators or providers; unknown zones in the project |
+| **Preuves attendues** | Harden report (Markdown), recovery plan (Markdown + JSON), MemoryRecord created |
+| **Gates humains** | Human reviews the baseline report before proceeding to stage_1 |
+| **Rollback** | N/A — read-only |
+| **MemoryRecord** | `reclaim_harden` record created in `--memory-dir` |
+| **Agents** | Intake Agent, Reclaim Agent, Security Agent |
+
+---
+
+### stage_1_governance
+
+| Dimension | Value |
+|---|---|
+| **Objectif** | Create the governance documentation baseline: architecture, decisions, security policy, AI policy, sovereignty, recovery roadmap |
+| **Préconditions** | stage_0_baseline complete |
+| **Actions** | Create ARCHITECTURE.md, aeos.toml, docs/RECOVERY.md, docs/SECURITY.md, docs/SOVEREIGNTY.md, docs/DECISIONS.md, docs/AI-DEVELOPMENT-POLICY.md |
+| **Risques** | Documentation written without reading actual project files; inaccurate architecture map |
+| **Preuves attendues** | 7 governance files created and reviewed; PR merged into main |
+| **Gates humains** | Human reviews all governance files before PR merge |
+| **Rollback** | Delete governance files (documentation only — no application code changed) |
+| **MemoryRecord** | Updated after PR merge: governance_baseline = present |
+| **Agents** | Recovery Agent, PR Agent |
+
+---
+
+### stage_2_secrets_env
+
+| Dimension | Value |
+|---|---|
+| **Objectif** | Stabilize the secrets and environment policy: verify .gitignore, rotate exposed credentials, confirm .env.example |
+| **Préconditions** | stage_1_governance complete |
+| **Actions** | Verify `git log --all --full-history -- .env`; confirm `.gitignore`; verify `.env.example`; rotate credentials if exposed; optionally rewrite Git history (`git filter-repo`) |
+| **Risques** | Credentials still valid in Git history after rotation; .env.example incomplete; Lovable integration still active |
+| **Preuves attendues** | `.env` absent from HEAD; `.gitignore` verified; credentials rotated; PR merged |
+| **Gates humains** | Human confirms rotation; human approves any `git filter-repo` history rewrite |
+| **Rollback** | Credential rotation is irreversible — plan before executing |
+| **MemoryRecord** | Updated: secrets_exposure = resolved |
+| **Agents** | Security Agent, PR Agent |
+
+---
+
+### stage_3_database_rls
+
+| Dimension | Value |
+|---|---|
+| **Objectif** | Harden database access: review RLS proposals, apply with human validation, document decisions |
+| **Préconditions** | stage_2_secrets_env complete |
+| **Actions** | `aeos supabase rls harden`; human reviews each SQL block; test with non-admin user after apply; document in docs/DECISIONS.md |
+| **Risques** | RLS too restrictive breaks the application; RLS too permissive leaves data exposed; apply without testing |
+| **Preuves attendues** | All RLS policies reviewed by human; SQL applied with explicit gate; post-apply test result documented; PR merged |
+| **Gates humains** | Human reviews every SQL block before apply; human confirms test result after apply |
+| **Rollback** | Rollback SQL prepared before any apply; service role verified before switching to anon role |
+| **MemoryRecord** | Updated: rls_status = hardened |
+| **Agents** | Database/RLS Agent, Security Agent, PR Agent |
+
+---
+
+### stage_4_tests_ci
+
+| Dimension | Value |
+|---|---|
+| **Objectif** | Establish a test baseline and CI quality gate to prevent regressions |
+| **Préconditions** | stage_1_governance complete |
+| **Actions** | Audit existing test setup; add smoke tests for critical flows; create `.github/workflows/ci.yml`; enable branch protection on main |
+| **Risques** | Tests pass on CI but fail locally; false confidence from low-coverage tests |
+| **Preuves attendues** | CI green on PR; smoke tests passing; branch protection active; PR merged |
+| **Gates humains** | Human reviews test coverage before declaring stage complete |
+| **Rollback** | Disable branch protection if CI blocks legitimate work; mark failing test as known failure |
+| **MemoryRecord** | Updated: ci_gate = active, tests = baseline |
+| **Agents** | Recovery Agent, PR Agent |
+
+---
+
+### stage_5_local_run
+
+| Dimension | Value |
+|---|---|
+| **Objectif** | Make the project runnable locally without cloud dependency |
+| **Préconditions** | stage_1_governance complete |
+| **Actions** | Document local run procedure in README; configure Supabase local (supabase CLI); verify `npm run dev` works locally |
+| **Risques** | Local Supabase schema diverges from cloud schema; environment variables not fully documented in .env.example |
+| **Preuves attendues** | Project starts with `npm run dev` locally; README documents the procedure; PR merged |
+| **Gates humains** | Human confirms local run works end-to-end before declaring stage complete |
+| **Rollback** | Revert README changes; no application code changed |
+| **MemoryRecord** | Updated: local_run = possible |
+| **Agents** | Recovery Agent, PR Agent |
+
+---
+
+### stage_6_portability
+
+| Dimension | Value |
+|---|---|
+| **Objectif** | Achieve full portability: Dockerfile, versioned migrations, reversible deployment |
+| **Préconditions** | stage_5_local_run complete |
+| **Actions** | Add Dockerfile; add docker-compose.yml; export database schema as local migration files; document deployment target |
+| **Risques** | Docker image too large; migration files out of sync with cloud schema |
+| **Preuves attendues** | `docker build` succeeds; `docker-compose up` starts the stack; migrations are reproducible on a fresh instance; PR merged |
+| **Gates humains** | Human confirms Docker build and migration replay on a fresh instance |
+| **Rollback** | Remove Dockerfile and docker-compose — no production impact |
+| **MemoryRecord** | Updated: portability = portable |
+| **Agents** | Sovereignty Agent, PR Agent |
+
+---
+
+### stage_7_migration_readiness
+
+| Dimension | Value |
+|---|---|
+| **Objectif** | Assess and prepare migration to a more sovereign architecture, if required |
+| **Préconditions** | stage_6_portability complete; explicit human decision to migrate |
+| **Actions** | `aeos migrate plan`; verify backup exists; dry-run migration; prepare rollback SQL; human approval; apply; test; document in docs/DECISIONS.md |
+| **Risques** | Data loss without backup; schema mismatch post-migration; application broken after switch |
+| **Preuves attendues** | Backup verified; dry-run passed; rollback path documented; post-migration tests green; MemoryRecord created |
+| **Gates humains** | Human approves migration plan; human confirms backup; human confirms post-migration test result |
+| **Rollback** | Restore from backup; revert connection strings; test original stack before switching traffic |
+| **MemoryRecord** | Created: migration_event with source, target, date, backup_verified, tests_passed |
+| **Agents** | Migration Agent, Database/RLS Agent, Security Agent, PR Agent |
+
+---
+
+### stage_8_local_ai_continuation
+
+| Dimension | Value |
+|---|---|
+| **Objectif** | Enable local-AI-first development continuation: configure local model, establish workflow |
+| **Préconditions** | stage_4_tests_ci complete |
+| **Actions** | Configure local model in aeos.toml; document AI workflow in docs/AI-DEVELOPMENT-POLICY.md; establish branch + PR discipline; define context filtering rules |
+| **Risques** | Local model insufficient for complex tasks; context filtering too strict or too loose |
+| **Preuves attendues** | Local model operational; AI workflow documented; first feature developed via local AI with PR evidence |
+| **Gates humains** | Human reviews AI-generated code before merge; human approves any frontier AI escalation |
+| **Rollback** | Revert aeos.toml changes; no application code changed |
+| **MemoryRecord** | Updated: local_ai = active, workflow = established |
+| **Agents** | Local AI Agent, Frontier AI Escalation Agent, PR Agent |
+
+---
+
+### stage_9_sovereign_operating_mode
+
+| Dimension | Value |
+|---|---|
+| **Objectif** | Maintain sovereignty over time: continuous audit, drift detection, periodic AEOS reports |
+| **Préconditions** | Stages 0, 1, 2, 4 complete (minimum); ideally stages 0–8 complete |
+| **Actions** | Schedule periodic `aeos reclaim harden` runs; `aeos memory timeline`; review reports; update governance docs; track new dependencies |
+| **Risques** | Sovereignty drift as new features add undocumented dependencies; AI policy not enforced for new team members |
+| **Preuves attendues** | Timeline shows stable or improving trend; new dependencies have ADRs; AI policy reviewed quarterly |
+| **Gates humains** | Human reviews each periodic report; human approves any new external dependency |
+| **Rollback** | Remove undocumented dependency; rotate newly exposed credentials |
+| **MemoryRecord** | New record after each periodic audit; timeline shows progression |
+| **Agents** | Operate Agent, Memory Agent, Security Agent |
+
+---
+
+### Stage-to-agent mapping
+
+| Stage | Primary agents |
+|---|---|
+| stage_0_baseline | Intake Agent · Reclaim Agent · Security Agent |
+| stage_1_governance | Recovery Agent · PR Agent |
+| stage_2_secrets_env | Security Agent · PR Agent |
+| stage_3_database_rls | Database/RLS Agent · Security Agent · PR Agent |
+| stage_4_tests_ci | Recovery Agent · PR Agent |
+| stage_5_local_run | Recovery Agent · PR Agent |
+| stage_6_portability | Sovereignty Agent · PR Agent |
+| stage_7_migration_readiness | Migration Agent · Database/RLS Agent · Security Agent · PR Agent |
+| stage_8_local_ai_continuation | Local AI Agent · Frontier AI Escalation Agent · PR Agent |
+| stage_9_sovereign_operating_mode | Operate Agent · Memory Agent · Security Agent |
+
+---
+
 ## See Also
 
 - [`docs/strategy/AEOS-PRODUCT-VISION.md`](AEOS-PRODUCT-VISION.md) — full strategic vision with use cases, target users, and positioning
 - [`docs/features/AEOS-BUILD-RAIL.md`](../features/AEOS-BUILD-RAIL.md) — Build Rail MVP documentation
 - [`docs/features/AEOS-RECLAIM-HARDEN.md`](../features/AEOS-RECLAIM-HARDEN.md) — Reclaim Rail harden command documentation
+- [`docs/features/AEOS-RECLAIM-RECOVERY.md`](../features/AEOS-RECLAIM-RECOVERY.md) — Recovery plan command documentation and Total Recovery Scope
 - [`docs/features/AEOS-SUPABASE-RLS-HARDENING.md`](../features/AEOS-SUPABASE-RLS-HARDENING.md) — RLS hardening chain documentation
 - [`docs/research/AEOS-RESEARCH-BACKLOG-LOCAL-FIRST-SOVEREIGNTY.md`](../research/AEOS-RESEARCH-BACKLOG-LOCAL-FIRST-SOVEREIGNTY.md) — research backlog on sovereignty and local AI
