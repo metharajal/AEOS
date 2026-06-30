@@ -33,6 +33,7 @@ security_app = typer.Typer(help="Security audit commands.")
 supabase_app = typer.Typer(help="Supabase integration audit and remediation.")
 supabase_rls_app = typer.Typer(help="Supabase RLS policy inspection.")
 reclaim_app = typer.Typer(help="Project reclaim and sovereignty analysis.")
+reclaim_recovery_app = typer.Typer(help="Recovery planning commands.")
 memory_app = typer.Typer(help="Memory Layer — read and inspect local audit records.")
 build_app = typer.Typer(help="Build Rail — plan and scaffold AEOS-native projects.")
 app.add_typer(project_app, name="project")
@@ -42,6 +43,7 @@ app.add_typer(security_app, name="security")
 app.add_typer(supabase_app, name="supabase")
 supabase_app.add_typer(supabase_rls_app, name="rls")
 app.add_typer(reclaim_app, name="reclaim")
+reclaim_app.add_typer(reclaim_recovery_app, name="recovery")
 app.add_typer(memory_app, name="memory")
 app.add_typer(build_app, name="build")
 
@@ -2566,3 +2568,189 @@ def build_scaffold_cmd(
         typer.echo(f"  {i}. {step}")
     typer.echo("")
     typer.echo("  applied: true  ·  read_only: false")
+
+
+# ---------------------------------------------------------------------------
+# reclaim recovery plan
+# ---------------------------------------------------------------------------
+
+
+@reclaim_recovery_app.command("plan")
+def reclaim_recovery_plan_cmd(
+    path: str = typer.Option(".", "--path", "-p", help="Path to project."),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+    output: str = typer.Option(
+        "",
+        "--output",
+        "-o",
+        help="Write the recovery plan as Markdown to this file.",
+    ),
+    overwrite: bool = typer.Option(
+        False,
+        "--overwrite",
+        help="Overwrite the output file if it already exists.",
+    ),
+) -> None:
+    """Generate a comprehensive recovery plan for an existing project (read-only)."""
+    from aeos.reclaim.recovery import (
+        build_recovery_markdown,
+        build_recovery_plan,
+        recovery_plan_to_dict,
+    )
+
+    project = Path(path).resolve()
+    if not project.is_dir():
+        typer.echo(f"Error: '{path}' does not exist.", err=True)
+        raise typer.Exit(code=1)
+
+    try:
+        plan = build_recovery_plan(project)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+
+    # ── --output mode: write Markdown ────────────────────────────────────────
+    if output:
+        output_path = Path(output)
+        if output_path.exists() and not overwrite:
+            typer.echo(
+                f"Error: '{output_path}' already exists."
+                " Use --overwrite to replace it.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        content = build_recovery_markdown(plan)
+        output_path.write_text(content, encoding="utf-8")
+        typer.echo(f"Recovery plan written to: {output_path}")
+        typer.echo(f"Status:  {plan.status}")
+        typer.echo(f"PRs:     {len(plan.recovery_pr_roadmap)} in roadmap")
+        typer.echo("  read_only: true  ·  applied: false")
+        return
+
+    # ── JSON mode ────────────────────────────────────────────────────────────
+    if as_json:
+        typer.echo(json.dumps(recovery_plan_to_dict(plan), indent=2))
+        return
+
+    # ── Text output ──────────────────────────────────────────────────────────
+    typer.echo("")
+    typer.echo("── Recovery Plan " + "─" * 43)
+    typer.echo(f"  Path:    {plan.project_path}")
+    typer.echo(f"  Project: {plan.project_name}")
+    typer.echo(f"  Status:  {plan.status}")
+    typer.echo("")
+
+    arch = plan.current_architecture
+    gen_list = arch.get("detected_generators", [])
+    prov_list = arch.get("detected_providers", [])
+    typer.echo("── Current Architecture " + "─" * 36)
+    typer.echo(f"  Frontend:    {arch.get('frontend', 'unknown')}")
+    typer.echo(f"  Backend:     {arch.get('backend', 'unknown')}")
+    typer.echo(f"  Database:    {arch.get('database', 'unknown')}")
+    typer.echo(f"  Deployment:  {arch.get('deployment', 'unknown')}")
+    typer.echo(f"  Portability: {arch.get('portability', 'unknown')}")
+    if isinstance(gen_list, list) and gen_list:
+        typer.echo(f"  Generators:  {', '.join(str(g) for g in gen_list)}")
+    if isinstance(prov_list, list) and prov_list:
+        typer.echo(f"  Providers:   {', '.join(str(p) for p in prov_list)}")
+    typer.echo("")
+
+    ctrl = plan.control_status
+    typer.echo("── Control Status " + "─" * 42)
+    typer.echo(f"  Secrets:         {ctrl.get('secrets', 'unknown')}")
+    typer.echo(f"  Secrets exposure:{ctrl.get('secrets_exposure', 'unknown')}")
+    typer.echo(f"  Source control:  {ctrl.get('source_control', 'unknown')}")
+    typer.echo(f"  Portability:     {ctrl.get('portability', 'unknown')}")
+    typer.echo("")
+
+    sec = plan.security_recovery
+    blockers = sec.get("immediate_blockers", [])
+    typer.echo("── Security Recovery " + "─" * 39)
+    typer.echo(f"  Status:           {sec.get('status', 'OK')}")
+    typer.echo(f"  Secret exposure:  {sec.get('secret_exposure_status', 'unknown')}")
+    if isinstance(blockers, list) and blockers:
+        typer.echo(f"  Immediate blockers ({len(blockers)}):")
+        for b in blockers[:3]:
+            typer.echo(f"    ✗ {b}")
+    else:
+        typer.echo("  No immediate security blockers.")
+    typer.echo("")
+
+    sov = plan.sovereignty_recovery
+    ext = sov.get("external_dependencies", [])
+    typer.echo("── Sovereignty Recovery " + "─" * 36)
+    typer.echo(f"  Status: {sov.get('status', 'OK')}")
+    if isinstance(ext, list) and ext:
+        typer.echo(f"  External deps ({len(ext)}): {' · '.join(str(d) for d in ext)}")
+    typer.echo("")
+
+    db = plan.database_recovery
+    typer.echo("── Database Recovery " + "─" * 39)
+    typer.echo(
+        f"  Supabase detected:  {'yes' if db.get('supabase_detected') else 'no'}"
+    )
+    if db.get("rls_verdict"):
+        typer.echo(f"  RLS verdict:        {db.get('rls_verdict')}")
+    fixes = db.get("generated_fixes_count", 0)
+    manual = db.get("manual_review_required", 0)
+    if fixes or manual:
+        typer.echo(f"  Auto-generated:     {fixes}")
+        typer.echo(f"  Manual review:      {manual}")
+    typer.echo("")
+
+    gov = plan.governance_recovery
+    typer.echo("── Governance Recovery " + "─" * 37)
+    for key, label in [
+        ("aeos_toml_present", "aeos.toml"),
+        ("decisions_doc_present", "docs/DECISIONS.md"),
+        ("security_doc_present", "docs/SECURITY.md"),
+        ("sovereignty_doc_present", "docs/SOVEREIGNTY.md"),
+    ]:
+        val = "present ✓" if gov.get(key) else "missing"
+        typer.echo(f"  {label:<24} {val}")
+    typer.echo("")
+
+    ci = plan.testing_ci_recovery
+    typer.echo("── Testing and CI " + "─" * 41)
+    typer.echo(f"  Tests:      {ci.get('tests_status', 'unknown')}")
+    typer.echo(f"  CI gate:    {ci.get('ci_status', 'unknown')}")
+    typer.echo("")
+
+    typer.echo("── Local AI Policy " + "─" * 41)
+    typer.echo(
+        f"  Can do:              {len(plan.local_ai_policy.can_do)} tasks by default"
+    )
+    n_approval = len(plan.local_ai_policy.requires_human_approval)
+    n_never = len(plan.local_ai_policy.must_never_send_to_frontier)
+    typer.echo(f"  Needs approval:      {n_approval} actions")
+    typer.echo(f"  Never send frontier: {n_never} types")
+    typer.echo("")
+
+    typer.echo("── Frontier AI Rules " + "─" * 39)
+    for rule in plan.frontier_ai_rules[:3]:
+        typer.echo(f"  ✗ {rule.rule}")
+    if len(plan.frontier_ai_rules) > 3:
+        typer.echo(f"  … and {len(plan.frontier_ai_rules) - 3} more rules")
+    typer.echo("")
+
+    n_prs = len(plan.recovery_pr_roadmap)
+    typer.echo(f"── Recovery PR Roadmap ({n_prs} PRs) " + "─" * 24)
+    for item in plan.recovery_pr_roadmap:
+        prereq = f" (after {item.prerequisite})" if item.prerequisite else ""
+        typer.echo(f"  PR {item.pr_number}  [{item.priority:<8}] {item.title}{prereq}")
+    typer.echo("")
+
+    n_cats = len(plan.development_continuation_backlog)
+    typer.echo(f"── Backlog ({n_cats} categories) " + "─" * 36)
+    for cat in plan.development_continuation_backlog:
+        typer.echo(f"  {cat.name:<24} {len(cat.items)} items")
+    typer.echo("")
+
+    typer.echo("── Recommended Next Action " + "─" * 33)
+    typer.echo(f"  → {plan.recommended_next_action}")
+    typer.echo("")
+    typer.echo(
+        "Read-only — no files modified, no migration applied, no database connection."
+    )
+    typer.echo("  read_only: true  ·  applied: false")
+    typer.echo("  → Use --output to export the full Markdown recovery plan.")

@@ -90,9 +90,11 @@ aeos build apply      # apply an action with explicit human gate
 
 **Current commands (production-ready):**
 ```
-aeos reclaim inspect --path <project>   # read-only control map + exit options
-aeos reclaim harden --path <project>    # full cross-domain audit + remediation plan
-aeos reclaim harden --path <project> --output <file>  # export Markdown report
+aeos reclaim inspect --path <project>                                    # read-only control map + exit options
+aeos reclaim harden --path <project>                                     # full cross-domain audit + remediation plan
+aeos reclaim harden --path <project> --output <file>                     # export Markdown report
+aeos reclaim recovery plan --path <project>                              # comprehensive recovery roadmap (read-only)
+aeos reclaim recovery plan --path <project> --output <file> --overwrite  # export full Markdown recovery plan
 ```
 
 **Sub-commands:**

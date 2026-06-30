@@ -10,16 +10,17 @@
 
 | Élément | État |
 |---|---|
-| Branche `main` | `6c5c598` — Sprint 4A mergé (PR #41) |
-| CI | Verte (1398 tests — sprint 4B local) |
-| AEOS CLI | `reclaim harden`, `memory list`, `memory show`, `memory compare`, `memory timeline`, `build plan`, `build scaffold` |
+| Branche `main` | `c4b4798` — Sprint 4B-1 mergé (PR #43) |
+| CI | Verte (1420 tests — sprint 5A local) |
+| AEOS CLI | `reclaim harden`, `reclaim recovery plan`, `memory list`, `memory show`, `memory compare`, `memory timeline`, `build plan`, `build scaffold` |
 | Memory Write | Sprint 3F — mergé, stable |
 | Memory Read CLI | Sprint 3G — mergé dans main (PR #36) |
 | Memory Compare | Sprint 3H — mergé dans main (PR #38) |
-| Memory Compare Validation | Sprint 3H-1 — mergé dans main (PR #39) |
 | Memory Timeline | Sprint 3I — mergé dans main (PR #40) |
 | Build Rail MVP | Sprint 4A — mergé dans main (PR #41) |
-| Build Scaffold MVP | Sprint 4B — **en attente de merge** (branch `sprint4b/build-scaffold-mvp`) |
+| Build Scaffold MVP | Sprint 4B — mergé dans main (PR #42) |
+| Build Scaffold Validation | Sprint 4B-1 — mergé dans main (PR #43) |
+| Recovery Plan MVP | Sprint 5A — **en attente de merge** (branch `sprint5a/reclaim-recovery-plan`) |
 | `ma-mairie-digitale` | Untouched — projet client intact |
 | `.env` | Non lu, non tracké, non copié |
 
@@ -28,17 +29,18 @@
 ## 2. Chaîne de commandes disponible dans main
 
 ```
-aeos reclaim harden  --path <project> --memory-dir <dir>               →  crée un MemoryRecord
-aeos memory list     --memory-dir <dir>                                 →  liste tous les records
-aeos memory show     --memory-dir <dir> --record <id>                   →  affiche un record
-aeos memory compare  --memory-dir <dir> --left <id> --right <id>        →  compare deux records
-aeos memory timeline --memory-dir <dir> --project <name>                →  timeline du projet
-aeos build plan      --name <name> --type <type> --stack <stack>        →  plan d'architecture
-aeos build scaffold  --name <name> --type <type> --stack <stack> --output <dir>  →  scaffold governance
+aeos reclaim harden          --path <project> --memory-dir <dir>               →  audit + MemoryRecord
+aeos reclaim recovery plan   --path <project> [--json] [--output <file>]       →  plan de récupération (read-only)
+aeos memory list             --memory-dir <dir>                                 →  liste tous les records
+aeos memory show             --memory-dir <dir> --record <id>                   →  affiche un record
+aeos memory compare          --memory-dir <dir> --left <id> --right <id>        →  compare deux records
+aeos memory timeline         --memory-dir <dir> --project <name>                →  timeline du projet
+aeos build plan              --name <name> --type <type> --stack <stack>        →  plan d'architecture (read-only)
+aeos build scaffold          --name <name> --type <type> --stack <stack> --output <dir>  →  scaffold governance
 ```
 
-Tous les modes `--json` sont disponibles. `build plan` est read-only. `build scaffold` écrit dans `--output` uniquement.
-Sprint 4B (`build scaffold`) est sur la branche `sprint4b/build-scaffold-mvp` — PR en attente.
+Tous les modes `--json` sont disponibles. `reclaim recovery plan` et `build plan` sont read-only.
+Sprint 5A (`reclaim recovery plan`) est sur la branche `sprint5a/reclaim-recovery-plan` — PR en attente.
 
 ---
 

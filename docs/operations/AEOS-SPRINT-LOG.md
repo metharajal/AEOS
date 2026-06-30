@@ -549,3 +549,43 @@ aucun réseau · aucun code applicatif · `ma-mairie-digitale` intact.
 **PR / Commit :** Sprint 4B-1 — branch `sprint4b1/build-scaffold-real-validation`
 **Statut :** DONE
 **Validation :** Validation réelle exécutée, tous les checks verts, repo clean.
+
+---
+
+## Sprint 5A — Reclaim Recovery Plan
+
+**Objectif :** Ajouter `aeos reclaim recovery plan` — plan de récupération complet
+pour un projet existant, en lecture seule.
+
+**Commande ajoutée :** `aeos reclaim recovery plan [--path] [--json] [--output] [--overwrite]`
+
+**13 sections couvertes :**
+1. Project Identity
+2. Current Architecture (frontend, backend, database, auth, deployment, portabilité)
+3. Control Status (secrets, exposition, source control, portabilité)
+4. Security Recovery (blocages immédiats, gitignore, .env.example)
+5. Sovereignty Recovery (dépendances externes, risques, exit strategy)
+6. Database and RLS Recovery (Supabase, RLS verdict, fixes auto, revue manuelle)
+7. Governance Recovery (aeos.toml, DECISIONS, SECURITY, SOVEREIGNTY)
+8. Testing and CI Recovery
+9. Local AI Development Policy (8 can_do, 7 requires_approval, 7 never_send)
+10. Frontier AI Escalation Rules (6 règles)
+11. Recovery PR Roadmap (7+ PRs avec priorité et prérequis)
+12. Development Continuation Backlog (6 catégories)
+13. Recommended Next Action
+
+**Fichiers ajoutés / modifiés :**
+- `src/aeos/reclaim/recovery.py` — nouveau module (RecoveryPlan + 5 dataclasses + builders)
+- `src/aeos/reclaim/__init__.py` — exports recovery ajoutés
+- `src/aeos/cli.py` — commande `aeos reclaim recovery plan` ajoutée
+- `tests/unit/test_reclaim_recovery.py` — 22 tests
+- `docs/features/AEOS-RECLAIM-RECOVERY.md` — documentation
+
+**Garanties read-only :**
+Aucun fichier modifié dans le projet audité · Aucune base de données contactée ·
+Aucun `.env` lu · Aucun secret affiché · Aucun appel réseau · Aucun appel IA externe ·
+`read_only: true` · `applied: false`
+
+**PR / Commit :** branch `sprint5a/reclaim-recovery-plan`
+**Statut :** DONE — 1420 tests passés
+**Validation :** `uv run pytest` → 1420 passed. `aeos reclaim recovery plan` fonctionnel.
