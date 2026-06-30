@@ -110,30 +110,52 @@ When behavior differs between interfaces, CLI defines correct behavior.
 
 ```
 src/aeos/
-├── cli.py                      # Typer CLI — primary entry point
-├── config.py                   # aeos.toml parsing
+├── cli.py                          # Typer CLI — primary entry point
+├── version.py
 ├── ai/
-│   └── router.py               # AI Routing Engine — local-first, frontier by exception
+│   ├── router.py                   # AI Routing Engine — local-first, frontier by exception
+│   ├── local.py                    # Local AI provider (Ollama)
+│   ├── frontier.py                 # Frontier AI provider (OpenAI-compatible)
+│   ├── config.py                   # AI configuration parsing
+│   └── doctor.py                   # Local runtime health check
 ├── build/
-│   ├── planner.py              # BuildPlan, stack selection
-│   └── scaffold.py             # Governance file scaffolding
+│   ├── planner.py                  # BuildPlan, stack selection
+│   └── scaffold.py                 # Governance file scaffolding
+├── generators/
+│   ├── base.py                     # Base generator contract
+│   ├── basic.py                    # Basic file generators
+│   └── python.py                   # Python project generators
 ├── memory/
-│   ├── models.py               # MemoryRecord, MemoryRecordSummary
-│   ├── store.py                # Local read/write, no cloud sync
-│   ├── compare.py              # Diff between two records
-│   └── timeline.py             # Project audit history
+│   ├── models.py                   # MemoryRecord, MemoryRecordSummary
+│   ├── store.py                    # Local read/write, no cloud sync
+│   ├── compare.py                  # Diff between two records
+│   └── timeline.py                 # Project audit history
+├── onboarding/
+│   └── checker.py                  # Onboarding state verification
+├── project/
+│   └── inspector.py                # General project inspection
+├── providers/
+│   └── supabase/
+│       ├── checker.py              # Supabase-specific analysis
+│       └── rls/
+│           ├── inspector.py        # RLS policy inspection
+│           ├── hardener.py         # RLS hardening proposals
+│           ├── generator.py        # RLS SQL generation
+│           ├── planner.py          # RLS remediation planning
+│           └── reviewer.py         # RLS policy review
 ├── reclaim/
-│   ├── inspector.py            # Discovery + Assessment engines
-│   ├── harden.py               # Security and sovereignty checks
-│   ├── recovery.py             # Recovery plan generation
-│   ├── planner.py              # Staged recovery planning
-│   ├── stages.py               # Ten recovery stages definition
-│   └── evidence.py             # Evidence Engine
-├── supabase/
-│   ├── inspector.py            # Supabase-specific analysis
-│   └── rls/                    # RLS policy analysis and hardening proposals
-└── security/
-    └── scanner.py              # Secret detection (names only, never values)
+│   ├── inspector.py                # Discovery + Assessment engines
+│   ├── hardener.py                 # Security and sovereignty checks
+│   ├── recovery.py                 # Recovery plan generation
+│   ├── planner.py                  # Staged recovery planning
+│   ├── stages.py                   # Ten recovery stages definition
+│   └── evidence.py                 # Evidence Engine
+├── report/
+│   └── generator.py                # Report generation
+├── security/
+│   └── checker.py                  # Secret detection (names only, never values)
+└── sovereignty/
+    └── checker.py                  # External dependency audit
 ```
 
 **Conventions (CONSTITUTION §5.1):**
@@ -238,9 +260,11 @@ All three must pass before any merge. CI gate enforces this.
 ```
 MANIFESTO.md           (supreme — immutable)
   └── CONSTITUTION.md  (identity and invariants)
-        └── governance/standards/  (implementation standards)
-              └── governance/playbooks/  (operational procedures)
-                    └── governance/adr/  (architecture decisions)
+        ├── governance/standards/   (implementation standards)
+        │     └── governance/playbooks/  (operational procedures)
+        │           └── governance/adr/  (architecture decisions)
+        ├── governance/dec/         (ratified platform decisions)
+        └── governance/rfc/         (proposals — not decisions)
 ```
 
 ---

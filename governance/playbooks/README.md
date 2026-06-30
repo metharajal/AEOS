@@ -28,6 +28,8 @@ CONSTITUTION.md        ← identity and invariants
 governance/standards/  ← implementation standards
 governance/playbooks/  ← operational procedures  ← you are here
 governance/adr/        ← individual architecture decisions
+governance/dec/        ← ratified platform decisions
+governance/rfc/        ← proposals (not decisions)
 ```
 
 ---
@@ -62,25 +64,31 @@ Every Playbook must include these seven sections:
 **Last reviewed:** YYYY-MM-DD
 
 ## 1. Purpose
-What this playbook is for. When to use it.
+What this playbook enables and when it applies.
 
-## 2. Prerequisites
-What must be true before starting. Tools, permissions, states.
+## 2. Preconditions
+The state required before starting. Preconditions that are not met
+must prevent the Playbook from starting.
 
 ## 3. Steps
-Numbered, precise steps. Each step has a clear action and expected outcome.
+Ordered sequence of actions with defined inputs, outputs, and
+evidence requirements for each step.
 
-## 4. Verification
-How to confirm the procedure succeeded.
+## 4. Human gates
+The points at which human approval is required before proceeding.
+Each gate specifies what the human is approving and what refusal means.
 
-## 5. Rollback
-How to undo each step if something goes wrong.
+## 5. Evidence
+The artifacts produced at each step that prove the step is complete.
+Evidence must be inspectable and auditable.
 
-## 6. Escalation
-When to stop and ask for help. Who to contact.
+## 6. Rollback
+The procedure to reverse each applied action. A step that applies
+an irreversible action without a defined rollback is incomplete.
 
-## 7. Post-completion
-What to document after the procedure. DEC or ADR to create. Memory to update.
+## 7. References
+Links to the Standard(s) this Playbook implements, and to any
+related ADRs or DECs.
 ```
 
 ---
