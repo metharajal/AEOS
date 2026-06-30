@@ -22,6 +22,12 @@ from aeos.reclaim.recovery import (
     build_recovery_plan,
     recovery_plan_to_dict,
 )
+from aeos.reclaim.stages import (
+    RecoveryStage,
+    get_recovery_stages,
+    get_stage_by_id,
+    recovery_stage_to_dict,
+)
 
 __all__ = [
     "FrontierAIRule",
@@ -37,9 +43,13 @@ __all__ = [
     "RecoveryBacklogCategory",
     "RecoveryPRRoadmapItem",
     "RecoveryPlan",
+    "RecoveryStage",
     "build_recovery_markdown",
     "build_recovery_plan",
+    "get_recovery_stages",
+    "get_stage_by_id",
     "recovery_plan_to_dict",
+    "recovery_stage_to_dict",
     "run_reclaim_harden",
     "run_reclaim_inspect",
 ]

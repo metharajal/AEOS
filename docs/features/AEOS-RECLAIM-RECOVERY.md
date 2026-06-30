@@ -453,6 +453,79 @@ aeos memory timeline --project <name>                → progression
 
 ---
 
+## 16. Recovery Stage Model (Sprint 5C)
+
+Le modèle de stages implémente le registre Python des 10 étapes du Total Sovereign Recovery Arc.
+Implémenté dans `src/aeos/reclaim/stages.py`. Read-only. Aucune mutation. Aucune exécution.
+
+### Structure d'un stage
+
+```python
+@dataclass
+class RecoveryStage:
+    id: str                        # ex. "stage_0_baseline"
+    name: str                      # ex. "Baseline Assessment"
+    objective: str
+    prerequisites: list[str]       # IDs des stages requis avant ce stage
+    actions: list[str]             # commandes ou tâches concrètes
+    risks: list[str]               # risques identifiés
+    expected_evidence: list[str]   # preuves attendues à la fin du stage
+    human_gate: str                # décision humaine requise
+    rollback_path: str | None      # chemin de rollback (None si aucun)
+    memory_record_type: str        # type de MemoryRecord créé en fin de stage
+    allowed_agents: list[str]      # agents autorisés pour ce stage
+```
+
+### Les 10 stages
+
+| Stage | Nom | Prérequis |
+|-------|-----|-----------|
+| `stage_0_baseline` | Baseline Assessment | — |
+| `stage_1_governance` | Governance Documentation | stage_0 |
+| `stage_2_secrets_env` | Secrets and Environment Policy | stage_1 |
+| `stage_3_database_rls` | Database and RLS Hardening | stage_2 |
+| `stage_4_tests_ci` | Tests and CI Gate | stage_1 |
+| `stage_5_local_run` | Local Run | stage_1 |
+| `stage_6_portability` | Portability | stage_5 |
+| `stage_7_migration_readiness` | Migration Readiness | stage_6 |
+| `stage_8_local_ai_continuation` | Local AI Continuation | stage_4 |
+| `stage_9_sovereign_operating_mode` | Sovereign Operating Mode | stage_0, 1, 2, 4 |
+
+### Commandes CLI
+
+```bash
+# Lister tous les stages
+aeos reclaim stage list
+aeos reclaim stage list --json
+
+# Afficher le détail d'un stage
+aeos reclaim stage show --id stage_0_baseline
+aeos reclaim stage show --id stage_7_migration_readiness --json
+```
+
+### API Python
+
+```python
+from aeos.reclaim import (
+    RecoveryStage,
+    get_recovery_stages,
+    get_stage_by_id,
+    recovery_stage_to_dict,
+)
+
+stages = get_recovery_stages()        # list[RecoveryStage] — 10 stages
+stage = get_stage_by_id("stage_0_baseline")  # RecoveryStage | None
+d = recovery_stage_to_dict(stage)    # dict[str, object] — JSON-serializable
+```
+
+### Garanties read-only
+
+- Aucun fichier modifié, aucune base de données contactée, aucun secret lu.
+- Les commandes CLI retournent toujours `read_only: true · applied: false`.
+- Aucun stage ne s'exécute — le modèle documente uniquement, il ne pilote pas.
+
+---
+
 ## Voir aussi
 
 - [`docs/features/AEOS-RECLAIM-HARDEN.md`](AEOS-RECLAIM-HARDEN.md)

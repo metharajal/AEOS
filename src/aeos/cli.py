@@ -34,6 +34,7 @@ supabase_app = typer.Typer(help="Supabase integration audit and remediation.")
 supabase_rls_app = typer.Typer(help="Supabase RLS policy inspection.")
 reclaim_app = typer.Typer(help="Project reclaim and sovereignty analysis.")
 reclaim_recovery_app = typer.Typer(help="Recovery planning commands.")
+reclaim_stage_app = typer.Typer(help="Recovery stage model commands.")
 memory_app = typer.Typer(help="Memory Layer — read and inspect local audit records.")
 build_app = typer.Typer(help="Build Rail — plan and scaffold AEOS-native projects.")
 app.add_typer(project_app, name="project")
@@ -44,6 +45,7 @@ app.add_typer(supabase_app, name="supabase")
 supabase_app.add_typer(supabase_rls_app, name="rls")
 app.add_typer(reclaim_app, name="reclaim")
 reclaim_app.add_typer(reclaim_recovery_app, name="recovery")
+reclaim_app.add_typer(reclaim_stage_app, name="stage")
 app.add_typer(memory_app, name="memory")
 app.add_typer(build_app, name="build")
 
@@ -2754,3 +2756,101 @@ def reclaim_recovery_plan_cmd(
     )
     typer.echo("  read_only: true  ·  applied: false")
     typer.echo("  → Use --output to export the full Markdown recovery plan.")
+
+
+# ---------------------------------------------------------------------------
+# reclaim stage list / show
+# ---------------------------------------------------------------------------
+
+
+@reclaim_stage_app.command("list")
+def reclaim_stage_list_cmd(
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """List all 10 recovery stages in the Total Sovereign Recovery model (read-only)."""
+    from aeos.reclaim.stages import get_recovery_stages, recovery_stage_to_dict
+
+    stages = get_recovery_stages()
+
+    if as_json:
+        payload = {
+            "read_only": True,
+            "applied": False,
+            "total": len(stages),
+            "stages": [recovery_stage_to_dict(s) for s in stages],
+        }
+        typer.echo(json.dumps(payload, indent=2))
+        return
+
+    typer.echo("")
+    typer.echo("── Recovery Stage Model " + "─" * 36)
+    typer.echo(f"  {len(stages)} stages  ·  read_only: true  ·  applied: false")
+    typer.echo("")
+    typer.echo(f"  {'STAGE ID':<36}  NAME")
+    typer.echo("  " + "─" * 58)
+    for stage in stages:
+        typer.echo(f"  {stage.id:<36}  {stage.name}")
+    typer.echo("")
+    typer.echo("  Use: aeos reclaim stage show --id <stage_id>")
+    typer.echo("  read_only: true  ·  applied: false")
+
+
+@reclaim_stage_app.command("show")
+def reclaim_stage_show_cmd(
+    stage_id: str = typer.Option(..., "--id", help="Stage ID to display."),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Show details for one recovery stage (read-only)."""
+    from aeos.reclaim.stages import get_stage_by_id, recovery_stage_to_dict
+
+    stage = get_stage_by_id(stage_id)
+    if stage is None:
+        typer.echo(f"Error: stage '{stage_id}' not found.", err=True)
+        typer.echo(
+            "  Run 'aeos reclaim stage list' to see all available stage IDs.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    if as_json:
+        typer.echo(json.dumps(recovery_stage_to_dict(stage), indent=2))
+        return
+
+    typer.echo("")
+    typer.echo(f"── {stage.id} " + "─" * max(0, 55 - len(stage.id)))
+    typer.echo(f"  Name:       {stage.name}")
+    typer.echo(f"  Objective:  {stage.objective}")
+    typer.echo("")
+
+    if stage.prerequisites:
+        typer.echo(f"  Prerequisites: {', '.join(stage.prerequisites)}")
+    else:
+        typer.echo("  Prerequisites: none")
+    typer.echo("")
+
+    typer.echo("  Actions:")
+    for i, action in enumerate(stage.actions, 1):
+        typer.echo(f"    {i}. {action}")
+    typer.echo("")
+
+    typer.echo("  Risks:")
+    for risk in stage.risks:
+        typer.echo(f"    - {risk}")
+    typer.echo("")
+
+    typer.echo("  Expected Evidence:")
+    for evidence in stage.expected_evidence:
+        typer.echo(f"    - {evidence}")
+    typer.echo("")
+
+    typer.echo(f"  Human Gate:  {stage.human_gate}")
+    rollback = stage.rollback_path if stage.rollback_path else "N/A — read-only"
+    typer.echo(f"  Rollback:    {rollback}")
+    typer.echo(f"  Memory Record Type:  {stage.memory_record_type}")
+    typer.echo("")
+
+    typer.echo("  Allowed Agents:")
+    for agent in stage.allowed_agents:
+        typer.echo(f"    - {agent}")
+    typer.echo("")
+    typer.echo("  read_only: true  ·  applied: false")

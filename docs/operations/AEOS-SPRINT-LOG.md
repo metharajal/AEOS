@@ -731,3 +731,56 @@ AEOS is a controlled agentic operating system for sovereign software recovery, c
 
 **PR / Commit :** branch `sprint5b/total-sovereign-recovery-vision`
 **Validation :** `uv run ruff check .` · `uv run mypy src` · `uv run pytest` — tous verts (aucun code modifié)
+
+---
+
+## Sprint 5C — Total Recovery Stage Model
+
+**Date :** 2026-06-29 → 2026-06-30
+**Branche :** `sprint5c/total-recovery-stage-model`
+**Objectif :** Implémenter en Python le registre des 10 stages du Total Sovereign Recovery Arc.
+
+### Ce qui a été ajouté
+
+**Python (read-only, aucune mutation) :**
+
+- `src/aeos/reclaim/stages.py` — `RecoveryStage` dataclass (11 champs), `get_recovery_stages()` (10 stages complets), `get_stage_by_id()`, `recovery_stage_to_dict()`
+- `src/aeos/reclaim/__init__.py` — 4 nouveaux imports et exports dans `__all__` (RUF022 trié)
+- `src/aeos/cli.py` — sous-app `reclaim stage` avec 2 commandes :
+  - `aeos reclaim stage list [--json]`
+  - `aeos reclaim stage show --id <stage_id> [--json]`
+
+**Tests :**
+
+- `tests/unit/test_reclaim_stages.py` — 45 tests couvrant : registry (10 stages, IDs uniques, ordre), dataclass (tous les champs), `get_stage_by_id`, `recovery_stage_to_dict`, CLI `stage list`, CLI `stage show`
+
+**Documentation :**
+
+- `docs/features/AEOS-RECLAIM-RECOVERY.md` — section 16 : Recovery Stage Model (structure, 10 stages, CLI, API Python, garanties read-only)
+- `docs/operations/AEOS-SPRINT-LOG.md` — cette entrée
+
+### Périmètre strict respecté
+
+| Dans le scope | Hors scope |
+|---------------|------------|
+| Modèles Python typés | Orchestrateur ou exécution de stages |
+| Registry des 10 stages | Mutation des MemoryRecords existants |
+| CLI read-only list/show | Modification du modèle Memory |
+| Tests unitaires | Appel réseau ou secret |
+| Documentation minimale | Liaison MemoryRecord réelle |
+
+### Invariants maintenus
+
+- `read_only: true · applied: false` présent dans toutes les sorties CLI
+- Aucun stage ne s'exécute — le modèle documente uniquement
+- Aucun `.env` lu, aucune base de données contactée, aucun secret affiché
+- Tous les checks verts : `ruff`, `mypy`, `pytest`
+
+**Fichiers modifiés :** 5 (3 Python + 2 docs)
+**Lignes ajoutées :** ~500
+**Commandes CLI ajoutées :** 2 (`stage list`, `stage show`)
+**Tests ajoutés :** 45
+**Statut :** DONE
+
+**PR / Commit :** branch `sprint5c/total-recovery-stage-model`
+**Validation :** `uv run ruff check .` · `uv run mypy src` · `uv run pytest` — tous verts
