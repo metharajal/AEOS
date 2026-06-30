@@ -921,3 +921,63 @@ AEOS is a controlled agentic operating system for sovereign software recovery, c
 
 **PR / Commit :** branch `sprint5e/recovery-evidence-engine`
 **Validation :** `uv run ruff check .` · `uv run mypy src` · `uv run pytest` — tous verts (1555 tests)
+
+---
+
+## Sprint MVP-1 — AEOS MVP 1.0 Strategy
+
+**Date :** 2026-07-01
+**Commit :** `ffa19ba` — poussé directement sur `main`
+**Objectif :** Définir le MVP commercial et finançable d'AEOS, aligné avec la Constitution, le MANIFESTO et la vision long terme.
+
+### Document créé
+
+- `docs/strategy/AEOS-MVP-1.0.md` — 1042 lignes — document stratégique investisseur
+
+### Contenu du document
+
+- Promesse bilingue EN + FR : arc Prototype → Recover → Govern → Migrate → Continue → Own
+- Positionnement : AEOS est la couche d'ingénierie au-dessus de TOUS les générateurs IA (Lovable, Bolt, Replit, Cursor, Claude Code, GitHub Copilot, Windsurf, futurs)
+- Utilisateurs cibles : CTO early-stage avec client sérieux, agences, DSI/entreprises legacy
+- Problème : "Due Diligence Gap" — les projets IA ne peuvent pas être vendus à des clients sérieux
+- Parcours utilisateur complet en 9 étapes (Import → Own)
+- 7 capacités produit incluses dans le MVP
+- Rôle du Workspace (V2), Transformation Engine (plan MVP, exécution V2), Continuation Engine
+- Critères de sortie MVP : techniques, commerciaux, narratifs
+- MVP = 4 démonstrations : A (Recover) · B (Migration Readiness) · C (Continue) · D (Workspace — mockup V2)
+- Démo investisseur 3 actes (7–10 minutes, zéro slides)
+- §13 Pourquoi maintenant : argument timing investisseur
+- §14 Pourquoi AEOS peut devenir une entreprise majeure : V5 "standard mondial"
+- §15 Roadmap MVP 1.0 → V2 → V3 → V4 → V5
+- §16 Why Us? — histoire fondateur, 5 avantages injustes, conviction
+- §17 Techstars / Pre-funding Link
+
+### Décisions stratégiques actées
+
+| Décision | Choix |
+|---|---|
+| Workspace | Exclu du MVP 1.0 — livré en V2 |
+| Migration execution | Exclue du MVP 1.0 — planning/readiness/dry-run seulement — exécution en V2 |
+| Migration planning | Incluse via `aeos reclaim recovery plan` stage_7 (production) |
+| Positionnement | AEOS pour tous les logiciels IA — pas uniquement Lovable |
+| Section fondateur | Ajoutée pour candidature Techstars |
+
+### Périmètre strict respecté
+
+- Documentation uniquement
+- Zéro fichier Python modifié
+- Zéro commande CLI modifiée
+- Zéro moteur modifié
+- Cohérence totale avec MANIFESTO, CONSTITUTION, ARCHITECTURE, Product Vision, Product Rails
+
+### Checks
+
+| Check | Résultat |
+|---|---|
+| `uv run ruff check .` | ✓ All checks passed |
+| `uv run mypy src` | ✓ No issues — 48 source files |
+| `uv run pytest` | ✓ **1555 passed** |
+
+**Fichiers modifiés :** 1 (nouveau fichier — documentation uniquement)
+**Fichiers Python modifiés :** 0
+**Statut :** DONE
