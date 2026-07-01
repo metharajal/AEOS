@@ -413,16 +413,12 @@ def test_cli_stage_plan_done_shows_done_section_in_text() -> None:
 
 
 def test_cli_stage_plan_unknown_id_exits_1() -> None:
-    result = runner.invoke(
-        app, ["reclaim", "stage", "plan", "--done", "stage_99_fake"]
-    )
+    result = runner.invoke(app, ["reclaim", "stage", "plan", "--done", "stage_99_fake"])
     assert result.exit_code == 1
 
 
 def test_cli_stage_plan_unknown_id_error_message() -> None:
-    result = runner.invoke(
-        app, ["reclaim", "stage", "plan", "--done", "stage_99_fake"]
-    )
+    result = runner.invoke(app, ["reclaim", "stage", "plan", "--done", "stage_99_fake"])
     assert "stage_99_fake" in result.output
 
 

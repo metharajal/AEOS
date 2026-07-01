@@ -3044,9 +3044,7 @@ def reclaim_evidence_summary_cmd(
 
     typer.echo("")
     typer.echo("── Evidence Summary " + "─" * 40)
-    typer.echo(
-        f"  {len(reports)} stages  ·  read_only: true  ·  applied: false"
-    )
+    typer.echo(f"  {len(reports)} stages  ·  read_only: true  ·  applied: false")
     typer.echo("")
     typer.echo(f"  {'STAGE ID':<36}  {'STATUS':<12}  ITEMS")
     typer.echo("  " + "─" * 64)

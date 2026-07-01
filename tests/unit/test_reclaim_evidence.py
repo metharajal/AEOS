@@ -231,9 +231,16 @@ def test_evidence_report_to_dict_keys() -> None:
     assert report is not None
     d = evidence_report_to_dict(report)
     expected_keys = {
-        "stage_id", "stage_name", "read_only", "applied",
-        "total_expected", "total_confirmed", "total_pending",
-        "evidence_status", "validation_blocked_reason", "items",
+        "stage_id",
+        "stage_name",
+        "read_only",
+        "applied",
+        "total_expected",
+        "total_confirmed",
+        "total_pending",
+        "evidence_status",
+        "validation_blocked_reason",
+        "items",
     }
     assert set(d.keys()) == expected_keys
 
@@ -311,9 +318,13 @@ def test_cli_evidence_report_invalid_index_string_exits_1() -> None:
     result = runner.invoke(
         app,
         [
-            "reclaim", "evidence", "report",
-            "--stage", _FIRST_ID,
-            "--confirmed", "abc",
+            "reclaim",
+            "evidence",
+            "report",
+            "--stage",
+            _FIRST_ID,
+            "--confirmed",
+            "abc",
         ],
     )
     assert result.exit_code == 1
@@ -324,9 +335,13 @@ def test_cli_evidence_report_out_of_bounds_index_exits_1() -> None:
     result = runner.invoke(
         app,
         [
-            "reclaim", "evidence", "report",
-            "--stage", _FIRST_ID,
-            "--confirmed", str(_N),
+            "reclaim",
+            "evidence",
+            "report",
+            "--stage",
+            _FIRST_ID,
+            "--confirmed",
+            str(_N),
         ],
     )
     assert result.exit_code == 1
@@ -337,9 +352,13 @@ def test_cli_evidence_report_negative_index_exits_1() -> None:
     result = runner.invoke(
         app,
         [
-            "reclaim", "evidence", "report",
-            "--stage", _FIRST_ID,
-            "--confirmed", "-1",
+            "reclaim",
+            "evidence",
+            "report",
+            "--stage",
+            _FIRST_ID,
+            "--confirmed",
+            "-1",
         ],
     )
     assert result.exit_code == 1

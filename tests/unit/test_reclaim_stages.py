@@ -266,16 +266,12 @@ def test_cli_stage_show_contains_stage_id() -> None:
 
 
 def test_cli_stage_show_invalid_id_exits_1() -> None:
-    result = runner.invoke(
-        app, ["reclaim", "stage", "show", "--id", "stage_99_fake"]
-    )
+    result = runner.invoke(app, ["reclaim", "stage", "show", "--id", "stage_99_fake"])
     assert result.exit_code == 1
 
 
 def test_cli_stage_show_invalid_id_error_message() -> None:
-    result = runner.invoke(
-        app, ["reclaim", "stage", "show", "--id", "stage_99_fake"]
-    )
+    result = runner.invoke(app, ["reclaim", "stage", "show", "--id", "stage_99_fake"])
     assert "stage_99_fake" in result.output
 
 
@@ -301,9 +297,7 @@ def test_cli_stage_show_mentions_read_only() -> None:
 
 def test_cli_stage_show_all_stages_exit_0() -> None:
     for stage_id in _EXPECTED_IDS:
-        result = runner.invoke(
-            app, ["reclaim", "stage", "show", "--id", stage_id]
-        )
+        result = runner.invoke(app, ["reclaim", "stage", "show", "--id", stage_id])
         assert result.exit_code == 0, (
             f"stage show --id {stage_id} failed: {result.output}"
         )

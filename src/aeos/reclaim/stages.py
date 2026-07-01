@@ -176,8 +176,7 @@ def get_recovery_stages() -> list[RecoveryStage]:
             id="stage_4_tests_ci",
             name="Tests and CI Gate",
             objective=(
-                "Establish a test baseline and CI quality gate to prevent "
-                "regressions."
+                "Establish a test baseline and CI quality gate to prevent regressions."
             ),
             prerequisites=["stage_1_governance"],
             actions=[
@@ -196,9 +195,7 @@ def get_recovery_stages() -> list[RecoveryStage]:
                 "Branch protection active",
                 "PR merged",
             ],
-            human_gate=(
-                "Human reviews test coverage before declaring stage complete."
-            ),
+            human_gate=("Human reviews test coverage before declaring stage complete."),
             rollback_path=(
                 "Disable branch protection if CI blocks legitimate work. "
                 "Add failing test as known failure."
@@ -209,9 +206,7 @@ def get_recovery_stages() -> list[RecoveryStage]:
         RecoveryStage(
             id="stage_5_local_run",
             name="Local Run",
-            objective=(
-                "Make the project runnable locally without cloud dependency."
-            ),
+            objective=("Make the project runnable locally without cloud dependency."),
             prerequisites=["stage_1_governance"],
             actions=[
                 "Document local run procedure in README",
@@ -260,8 +255,7 @@ def get_recovery_stages() -> list[RecoveryStage]:
                 "PR merged",
             ],
             human_gate=(
-                "Human confirms Docker build and migration replay on a "
-                "fresh instance."
+                "Human confirms Docker build and migration replay on a fresh instance."
             ),
             rollback_path=(
                 "Remove Dockerfile and docker-compose. No production impact."
@@ -342,9 +336,7 @@ def get_recovery_stages() -> list[RecoveryStage]:
                 "Human reviews AI-generated code before merge. "
                 "Human approves any frontier AI escalation."
             ),
-            rollback_path=(
-                "Revert aeos.toml changes. No application code changed."
-            ),
+            rollback_path=("Revert aeos.toml changes. No application code changed."),
             memory_record_type="local_ai_active",
             allowed_agents=[
                 "Local AI Agent",
@@ -386,8 +378,7 @@ def get_recovery_stages() -> list[RecoveryStage]:
                 "new external dependency."
             ),
             rollback_path=(
-                "Remove undocumented dependency. "
-                "Rotate newly exposed credentials."
+                "Remove undocumented dependency. Rotate newly exposed credentials."
             ),
             memory_record_type="periodic_audit",
             allowed_agents=["Operate Agent", "Memory Agent", "Security Agent"],

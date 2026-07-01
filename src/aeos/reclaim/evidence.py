@@ -91,9 +91,7 @@ def build_evidence_report(
         missing = [item.label for item in items if item.status == "pending"]
         n = len(missing)
         noun = "item" if n == 1 else "items"
-        validation_blocked_reason = (
-            f"{n} evidence {noun} missing: {'; '.join(missing)}"
-        )
+        validation_blocked_reason = f"{n} evidence {noun} missing: {'; '.join(missing)}"
     else:
         evidence_status = "unverified"
         validation_blocked_reason = "No evidence confirmed for this stage."
