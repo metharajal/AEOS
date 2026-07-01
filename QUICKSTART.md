@@ -158,25 +158,40 @@ aeos workspace demo --output-dir /tmp/aeos-workspace-demo --overwrite
 
 ---
 
+## Check Workspace Status
+
+```sh
+aeos workspace status
+```
+
+Shows what is registered, whether the workspace has been generated, and the
+suggested next command. No files are written.
+
+---
+
 ## Open the Workspace in a Browser
 
-**macOS:**
-
 ```sh
-open /tmp/aeos-workspace-demo/index.html
+aeos workspace open --path /tmp/aeos-workspace-demo/index.html
 ```
 
-**Linux:**
+Opens the portfolio in your default browser using Python's `webbrowser`
+module — no `open` / `xdg-open` / subprocess needed.
+
+If you omit `--path`, AEOS uses the default workspace location
+(`$TMPDIR/aeos-workspace-demo/index.html`):
 
 ```sh
-xdg-open /tmp/aeos-workspace-demo/index.html
+aeos workspace open
 ```
 
-**Windows (WSL):**
+**Manual alternatives:**
 
-```sh
-explorer.exe "$(wslpath -w /tmp/aeos-workspace-demo/index.html)"
-```
+| Platform | Command |
+|----------|---------|
+| macOS | `open /tmp/aeos-workspace-demo/index.html` |
+| Linux | `xdg-open /tmp/aeos-workspace-demo/index.html` |
+| Windows (WSL) | `explorer.exe "$(wslpath -w /tmp/aeos-workspace-demo/index.html)"` |
 
 ---
 

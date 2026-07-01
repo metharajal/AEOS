@@ -3654,3 +3654,71 @@ def workspace_demo(
             typer.echo(f"  ! {w}")
     typer.echo("Read-only — no files modified, no migration applied.")
     typer.echo("  read_only: true  ·  applied: false")
+
+
+# ---------------------------------------------------------------------------
+# workspace status
+# ---------------------------------------------------------------------------
+
+
+@workspace_app.command("status")
+def workspace_status_cmd(
+    output_dir: str = typer.Option(
+        "",
+        "--output-dir",
+        help="Workspace directory to check (default: system temp/aeos-workspace-demo).",
+    ),
+) -> None:
+    """Show the current AEOS workspace state (registry + generated workspace)."""
+    from aeos.project.registry import DEFAULT_REGISTRY
+    from aeos.workspace.ux import DEFAULT_WORKSPACE_DIR, workspace_status
+
+    ws_dir = Path(output_dir) if output_dir else DEFAULT_WORKSPACE_DIR
+
+    result = workspace_status(DEFAULT_REGISTRY, ws_dir)
+
+    reg_tag = "yes" if result.registry_exists else "no"
+    idx_tag = "yes" if result.index_exists else "no"
+
+    typer.echo("AEOS Workspace Status")
+    typer.echo("")
+    typer.echo(f"Registry:          {result.registry_path}")
+    typer.echo(f"Registry exists:   {reg_tag}")
+    if result.registry_exists:
+        noun = "project" if result.project_count == 1 else "projects"
+        typer.echo(f"Registered:        {result.project_count} {noun}")
+    typer.echo("")
+    typer.echo(f"Workspace dir:     {result.workspace_dir}")
+    typer.echo(f"index.html exists: {idx_tag}")
+    typer.echo("")
+    typer.echo(f"Suggested next:    {result.suggested_command}")
+    typer.echo("")
+    typer.echo("  read_only: true  ·  applied: false")
+
+
+# ---------------------------------------------------------------------------
+# workspace open
+# ---------------------------------------------------------------------------
+
+
+@workspace_app.command("open")
+def workspace_open_cmd(
+    path: str = typer.Option(
+        "",
+        "--path",
+        help="Path to index.html to open (default: workspace-demo index.html).",
+    ),
+) -> None:
+    """Open the generated workspace in the default browser (read-only)."""
+    from aeos.workspace.ux import DEFAULT_WORKSPACE_DIR, workspace_open
+
+    index_path = Path(path) if path else DEFAULT_WORKSPACE_DIR / "index.html"
+
+    try:
+        workspace_open(index_path)
+    except FileNotFoundError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+
+    typer.echo(f"Opening: {index_path}")
+    typer.echo("  read_only: true  ·  applied: false")
