@@ -3722,3 +3722,30 @@ def workspace_open_cmd(
 
     typer.echo(f"Opening: {index_path}")
     typer.echo("  read_only: true  ·  applied: false")
+
+
+# ---------------------------------------------------------------------------
+# workspace init
+# ---------------------------------------------------------------------------
+
+
+@workspace_app.command("init")
+def workspace_init_cmd() -> None:
+    """Create ~/.aeos and the default registry if absent (idempotent)."""
+    from aeos.workspace.init import workspace_init
+
+    result = workspace_init()
+
+    init_tag = "yes" if result.initialized else "no (already existed)"
+    noun = "project" if result.project_count == 1 else "projects"
+
+    typer.echo("AEOS Workspace Init")
+    typer.echo("")
+    typer.echo(f"Workspace home:    {result.aeos_home}")
+    typer.echo(f"Registry:          {result.registry_path}")
+    typer.echo(f"Initialized:       {init_tag}")
+    typer.echo(f"Projects:          {result.project_count} {noun}")
+    typer.echo("")
+    typer.echo(f"Suggested next:    {result.suggested_command}")
+    typer.echo("")
+    typer.echo("  read_only: true  ·  applied: false")

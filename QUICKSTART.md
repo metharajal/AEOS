@@ -47,6 +47,35 @@ No `pip install`, no virtualenv setup — `uv` handles it automatically.
 
 ---
 
+## Initialize the Workspace
+
+On a fresh machine, run this once to create the AEOS home directory and an
+empty registry:
+
+```sh
+aeos workspace init
+```
+
+Expected output:
+
+```
+AEOS Workspace Init
+
+Workspace home:    /Users/you/.aeos
+Registry:          /Users/you/.aeos/projects.json
+Initialized:       yes
+Projects:          0 projects
+
+Suggested next:    aeos project register --name <project> --memory-dir <path>/memory
+
+  read_only: true  ·  applied: false
+```
+
+This is idempotent — running it again on a machine that already has a registry
+will report `Initialized: no (already existed)` and leave everything untouched.
+
+---
+
 ## Register a Project
 
 Tell AEOS where your project's audit records live:
