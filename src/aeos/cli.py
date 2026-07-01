@@ -3170,3 +3170,53 @@ def ui_project_workspace(
     typer.echo(f"Verdict:    {pr.verdict}")
     typer.echo("Read-only — no files modified, no migration applied.")
     typer.echo("  read_only: true  ·  applied: false")
+
+
+# ---------------------------------------------------------------------------
+# ui evidence-pack
+# ---------------------------------------------------------------------------
+
+
+@ui_app.command("evidence-pack")
+def ui_evidence_pack(
+    memory_dir: str = typer.Option(
+        ..., "--memory-dir", help="Directory containing local memory records."
+    ),
+    project: str = typer.Option(
+        ..., "--project", help="Project name to build the evidence pack for."
+    ),
+    output_dir: str = typer.Option(
+        ...,
+        "--output-dir",
+        help="Directory to write the evidence pack into.",
+    ),
+    overwrite: bool = typer.Option(
+        False,
+        "--overwrite",
+        help="Overwrite existing output directory contents.",
+    ),
+) -> None:
+    """Generate a multi-file evidence pack from local memory records (read-only)."""
+    from aeos.ui.evidence_pack import generate_evidence_pack
+
+    mem_path = Path(memory_dir)
+    out_path = Path(output_dir)
+
+    try:
+        result = generate_evidence_pack(mem_path, project, out_path, overwrite)
+    except FileNotFoundError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+
+    typer.echo(f"Pack:       {result.output_dir}")
+    typer.echo(f"Project:    {result.project_name}")
+    typer.echo(f"Records:    {result.record_count}")
+    typer.echo(f"Verdict:    {result.verdict}")
+    typer.echo(f"Files:      {len(result.files)}")
+    for f in result.files:
+        typer.echo(f"  {f.name}")
+    typer.echo("Read-only — no files modified, no migration applied.")
+    typer.echo("  read_only: true  ·  applied: false")
