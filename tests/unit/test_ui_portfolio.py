@@ -516,7 +516,17 @@ def test_cli_portfolio_registry_and_memory_dir_exclusive(tmp_path: Path) -> None
     assert "mutually exclusive" in result.output
 
 
-def test_cli_portfolio_neither_option_errors(tmp_path: Path) -> None:
+def test_cli_portfolio_default_registry_not_found(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When no --memory-dir or --registry given, default registry must exist."""
+    import aeos.cli as cli_mod
+    import aeos.project.registry as reg_mod
+
+    fake_default = tmp_path / "projects.json"  # does not exist
+    monkeypatch.setattr(reg_mod, "DEFAULT_REGISTRY", fake_default)
+    monkeypatch.setattr(cli_mod, "DEFAULT_REGISTRY", fake_default, raising=False)
+
     result = runner.invoke(
         app,
         [
@@ -527,6 +537,44 @@ def test_cli_portfolio_neither_option_errors(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 1
+    assert "does not exist" in result.output
+
+
+def test_cli_portfolio_no_flags_uses_default_registry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When no --memory-dir or --registry given, use DEFAULT_REGISTRY automatically."""
+    import aeos.cli as cli_mod
+    import aeos.project.registry as reg_mod
+    from aeos.project.registry import (
+        ProjectRegistration,
+        ProjectRegistry,
+        save_registry,
+    )
+
+    # Seed memory dir and default registry
+    mem = tmp_path / "memory"
+    mem.mkdir()
+    _write(mem, _make_record(project_name="default-proj"))
+
+    fake_default = tmp_path / "projects.json"
+    reg = ProjectRegistration(
+        name="default-proj", project_type="recovered-project", memory_dir=mem
+    )
+    save_registry(ProjectRegistry(registry_path=fake_default, projects=[reg]))
+
+    monkeypatch.setattr(reg_mod, "DEFAULT_REGISTRY", fake_default)
+    monkeypatch.setattr(cli_mod, "DEFAULT_REGISTRY", fake_default, raising=False)
+
+    out = tmp_path / "index.html"
+    result = runner.invoke(
+        app,
+        ["ui", "portfolio", "--output", str(out)],
+    )
+    assert result.exit_code == 0, result.output
+    assert out.exists()
+    assert "default-proj" in result.output
+    assert "registry" in result.output
 
 
 def test_cli_portfolio_registry_not_found(tmp_path: Path) -> None:

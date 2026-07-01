@@ -376,3 +376,55 @@ def test_cli_workspace_demo_output_structure(tmp_path: Path) -> None:
     ep = out / "my-proj" / "evidence-pack"
     for f in _PACK_FILES:
         assert (ep / f).exists(), f"Missing: {ep / f}"
+
+
+# ---------------------------------------------------------------------------
+# CLI — default registry (MVP-CORE-3)
+# ---------------------------------------------------------------------------
+
+
+def test_cli_workspace_demo_default_registry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Without --registry, DEFAULT_REGISTRY (~/.aeos/projects.json) is used."""
+    import aeos.project.registry as reg_mod
+
+    mem_dir = _seed_project(tmp_path / "proj", "default-proj")
+    fake_default = tmp_path / "projects.json"
+    reg = ProjectRegistration(
+        name="default-proj",
+        project_type="recovered-project",
+        memory_dir=mem_dir,
+    )
+    register_project(reg, fake_default)
+
+    monkeypatch.setattr(reg_mod, "DEFAULT_REGISTRY", fake_default)
+
+    out = tmp_path / "ws"
+    result = runner.invoke(
+        app,
+        ["workspace", "demo", "--output-dir", str(out), "--overwrite"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "default-proj" in result.output
+    assert (out / "index.html").exists()
+    assert (out / "default-proj" / "dashboard.html").exists()
+
+
+def test_cli_workspace_demo_default_registry_not_found(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Without --registry and default missing, exit 1 with clear error."""
+    import aeos.project.registry as reg_mod
+
+    fake_default = tmp_path / "projects.json"  # intentionally not created
+    monkeypatch.setattr(reg_mod, "DEFAULT_REGISTRY", fake_default)
+
+    result = runner.invoke(
+        app,
+        ["workspace", "demo", "--output-dir", str(tmp_path / "ws")],
+    )
+
+    assert result.exit_code == 1
+    assert "Error" in result.output

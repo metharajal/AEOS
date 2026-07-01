@@ -268,7 +268,7 @@ def project_register(
     registry: str = typer.Option(
         "",
         "--registry",
-        help="Registry file path (default: ~/.aeos/registry.json).",
+        help="Registry file path (default: ~/.aeos/projects.json).",
     ),
     as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
 ) -> None:
@@ -350,7 +350,7 @@ def project_list(
     registry: str = typer.Option(
         "",
         "--registry",
-        help="Registry file path (default: ~/.aeos/registry.json).",
+        help="Registry file path (default: ~/.aeos/projects.json).",
     ),
     as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
 ) -> None:
@@ -447,7 +447,7 @@ def project_show(
     registry: str = typer.Option(
         "",
         "--registry",
-        help="Registry file path (default: ~/.aeos/registry.json).",
+        help="Registry file path (default: ~/.aeos/projects.json).",
     ),
     as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
 ) -> None:
@@ -3513,7 +3513,8 @@ def ui_portfolio(
 ) -> None:
     """Generate a static HTML portfolio from memory records or a project registry.
 
-    Provide exactly one of --memory-dir or --registry.
+    Provide --memory-dir or --registry. If neither is given, the default
+    registry (~/.aeos/projects.json) is used automatically.
     """
     from aeos.ui.portfolio import load_portfolio_data, render_portfolio
 
@@ -3521,9 +3522,6 @@ def ui_portfolio(
         typer.echo(
             "Error: --memory-dir and --registry are mutually exclusive.", err=True
         )
-        raise typer.Exit(code=1)
-    if not memory_dir and not registry:
-        typer.echo("Error: one of --memory-dir or --registry is required.", err=True)
         raise typer.Exit(code=1)
 
     output_path = Path(output)
@@ -3534,13 +3532,18 @@ def ui_portfolio(
         )
         raise typer.Exit(code=1)
 
-    # ── Registry mode ────────────────────────────────────────────────────────
-    if registry:
-        from aeos.project.registry import load_registry
+    # ── Registry mode (explicit --registry or implicit default) ─────────────
+    if registry or not memory_dir:
+        from aeos.project.registry import DEFAULT_REGISTRY, load_registry
 
-        reg_path = Path(registry)
+        reg_path = Path(registry) if registry else DEFAULT_REGISTRY
         if not reg_path.exists():
-            typer.echo(f"Error: registry file '{registry}' does not exist.", err=True)
+            typer.echo(
+                f"Error: registry file '{reg_path}' does not exist.\n"
+                "  Use --memory-dir to specify a memory directory, or\n"
+                "  run 'aeos project register' to create the default registry.",
+                err=True,
+            )
             raise typer.Exit(code=1)
 
         reg_data = load_registry(reg_path)
@@ -3594,9 +3597,9 @@ def ui_portfolio(
 @workspace_app.command("demo")
 def workspace_demo(
     registry: str = typer.Option(
-        ...,
+        "",
         "--registry",
-        help="Path to the AEOS project registry JSON file.",
+        help="Registry JSON file (default: ~/.aeos/projects.json).",
     ),
     output_dir: str = typer.Option(
         ...,
@@ -3613,10 +3616,12 @@ def workspace_demo(
 
     Produces: index.html (portfolio) + per-project dashboard, workspace,
     and evidence-pack for every registered project.
+    If --registry is omitted, ~/.aeos/projects.json is used automatically.
     """
+    from aeos.project.registry import DEFAULT_REGISTRY
     from aeos.workspace.demo import generate_workspace_demo
 
-    reg_path = Path(registry)
+    reg_path = Path(registry) if registry else DEFAULT_REGISTRY
     out_path = Path(output_dir)
 
     try:

@@ -1,7 +1,7 @@
 """
 AEOS Project Registry — persist watched-project metadata to a local JSON file.
 
-Writes only to the AEOS home directory (~/.aeos/registry.json by default).
+Writes only to the AEOS home directory (~/.aeos/projects.json by default).
 Never reads .env. Never modifies client project files. No network. No secrets.
 """
 
@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 AEOS_HOME: Path = Path.home() / ".aeos"
-DEFAULT_REGISTRY: Path = AEOS_HOME / "registry.json"
+DEFAULT_REGISTRY: Path = AEOS_HOME / "projects.json"
 
 _TS_FMT = "%Y-%m-%dT%H:%M:%SZ"
 
