@@ -3,6 +3,11 @@ from aeos.workspace.demo import (
     WorkspaceDemoResult,
     generate_workspace_demo,
 )
+from aeos.workspace.doctor import (
+    CheckItem,
+    DoctorResult,
+    workspace_doctor,
+)
 from aeos.workspace.init import (
     WorkspaceInitResult,
     workspace_init,
@@ -16,11 +21,14 @@ from aeos.workspace.ux import (
 
 __all__ = [
     "DEFAULT_WORKSPACE_DIR",
+    "CheckItem",
+    "DoctorResult",
     "ProjectDemoResult",
     "WorkspaceDemoResult",
     "WorkspaceInitResult",
     "WorkspaceStatusResult",
     "generate_workspace_demo",
+    "workspace_doctor",
     "workspace_init",
     "workspace_open",
     "workspace_status",

@@ -76,6 +76,38 @@ will report `Initialized: no (already existed)` and leave everything untouched.
 
 ---
 
+## Diagnose the Workspace
+
+After init (or at any time), run the doctor to verify that everything is in
+order:
+
+```sh
+aeos workspace doctor
+```
+
+Expected output on a fresh install:
+
+```
+AEOS Workspace Doctor
+
+  [OK]       AEOS home              /Users/you/.aeos
+  [OK]       Registry               /Users/you/.aeos/projects.json
+  [OK]       Registry readable      valid JSON · 0 project(s)
+  [WARNING]  Projects registered    0 projects  (run: aeos project register ...)
+  [WARNING]  Workspace index        /tmp/aeos-workspace-demo/index.html  (not found)
+
+Overall:           WARNING
+
+Suggested next:    aeos project register --name <project> --memory-dir <path>/memory
+
+  read_only: true  ·  applied: false
+```
+
+`WARNING` is expected at this stage — no projects registered yet.
+`ERROR` means the registry is missing or corrupt; run `aeos workspace init`.
+
+---
+
 ## Register a Project
 
 Tell AEOS where your project's audit records live:
