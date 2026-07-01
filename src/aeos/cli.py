@@ -3220,3 +3220,55 @@ def ui_evidence_pack(
         typer.echo(f"  {f.name}")
     typer.echo("Read-only — no files modified, no migration applied.")
     typer.echo("  read_only: true  ·  applied: false")
+
+
+# ---------------------------------------------------------------------------
+# ui portfolio
+# ---------------------------------------------------------------------------
+
+
+@ui_app.command("portfolio")
+def ui_portfolio(
+    memory_dir: str = typer.Option(
+        ...,
+        "--memory-dir",
+        help="Directory containing local memory records.",
+    ),
+    output: str = typer.Option(
+        ..., "--output", "-o", help="Write the HTML portfolio to this file."
+    ),
+    overwrite: bool = typer.Option(
+        False,
+        "--overwrite",
+        help="Overwrite the output file if it already exists.",
+    ),
+) -> None:
+    """Generate a static HTML portfolio from local memory records (read-only)."""
+    from aeos.ui.portfolio import load_portfolio_data, render_portfolio
+
+    mem_path = Path(memory_dir)
+    output_path = Path(output)
+
+    if output_path.exists() and not overwrite:
+        typer.echo(
+            f"Error: '{output_path}' already exists. Use --overwrite to replace it.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    try:
+        data = load_portfolio_data([mem_path])
+    except FileNotFoundError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    html = render_portfolio(data)
+    output_path.write_text(html, encoding="utf-8")
+
+    typer.echo(f"Portfolio:  {output_path}")
+    typer.echo(f"Projects:   {len(data.projects)}")
+    for entry in data.projects:
+        typer.echo(f"  {entry.project_name}  →  {entry.verdict}")
+    typer.echo("Read-only — no files modified, no migration applied.")
+    typer.echo("  read_only: true  ·  applied: false")
