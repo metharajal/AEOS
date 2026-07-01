@@ -3749,3 +3749,43 @@ def workspace_init_cmd() -> None:
     typer.echo(f"Suggested next:    {result.suggested_command}")
     typer.echo("")
     typer.echo("  read_only: true  ·  applied: false")
+
+
+# ---------------------------------------------------------------------------
+# workspace doctor
+# ---------------------------------------------------------------------------
+
+
+@workspace_app.command("doctor")
+def workspace_doctor_cmd(
+    output_dir: str = typer.Option(
+        "",
+        "--output-dir",
+        help="Workspace dir to check (default: tmpdir/aeos-workspace-demo).",
+    ),
+) -> None:
+    """Diagnose the local AEOS workspace (read-only, no network)."""
+    from aeos.project.registry import DEFAULT_REGISTRY
+    from aeos.workspace.doctor import workspace_doctor
+    from aeos.workspace.ux import DEFAULT_WORKSPACE_DIR
+
+    ws_dir = Path(output_dir) if output_dir else DEFAULT_WORKSPACE_DIR
+
+    result = workspace_doctor(registry_path=DEFAULT_REGISTRY, workspace_dir=ws_dir)
+
+    typer.echo("AEOS Workspace Doctor")
+    typer.echo("")
+
+    for check in result.checks:
+        tag = f"[{check.status}]"
+        typer.echo(f"  {tag:<9}  {check.name:<32}  {check.detail}")
+
+    typer.echo("")
+    typer.echo(f"Overall:           {result.overall_status}")
+    typer.echo("")
+    typer.echo(f"Suggested next:    {result.suggested_command}")
+    typer.echo("")
+    typer.echo("  read_only: true  ·  applied: false")
+
+    if result.overall_status == "ERROR":
+        raise typer.Exit(code=1)
