@@ -239,6 +239,99 @@ def project_inspect(
     typer.echo(f"{'remote origin':<30} {remote}")
 
 
+# ---------------------------------------------------------------------------
+# project register
+# ---------------------------------------------------------------------------
+
+
+@project_app.command("register")
+def project_register(
+    name: str = typer.Option(..., "--name", help="Project name to register."),
+    memory_dir: str = typer.Option(
+        ..., "--memory-dir", help="Path to the project's local memory directory."
+    ),
+    evidence_dir: str = typer.Option(
+        "",
+        "--evidence-dir",
+        help="Path to the project's evidence output directory (optional).",
+    ),
+    project_type: str = typer.Option(
+        "recovered-project",
+        "--type",
+        "-t",
+        help="Project type (e.g. recovered-project, audited-project).",
+    ),
+    registry: str = typer.Option(
+        "",
+        "--registry",
+        help="Registry file path (default: ~/.aeos/registry.json).",
+    ),
+    overwrite: bool = typer.Option(
+        False,
+        "--overwrite",
+        help="Overwrite the registration if the project name already exists.",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Register a project in the local AEOS project registry."""
+    from aeos.project.registry import (
+        DEFAULT_REGISTRY,
+        ProjectRegistration,
+        register_project as _register,
+    )
+
+    mem_path = Path(memory_dir)
+    if not mem_path.exists():
+        typer.echo(
+            f"Error: memory directory '{memory_dir}' does not exist.", err=True
+        )
+        raise typer.Exit(code=1)
+
+    ev_path = Path(evidence_dir) if evidence_dir else None
+
+    reg_path = Path(registry) if registry else DEFAULT_REGISTRY
+
+    registration = ProjectRegistration(
+        name=name,
+        project_type=project_type,
+        memory_dir=mem_path,
+        evidence_dir=ev_path,
+    )
+
+    try:
+        updated = _register(registration, reg_path, overwrite=overwrite)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+
+    if as_json:
+        payload: dict[str, object] = {
+            "registered": True,
+            "name": registration.name,
+            "type": registration.project_type,
+            "memory_dir": str(registration.memory_dir),
+            "evidence_dir": (
+                str(registration.evidence_dir)
+                if registration.evidence_dir is not None
+                else None
+            ),
+            "registered_at": registration.registered_at,
+            "registry": str(reg_path),
+            "total_projects": len(updated.projects),
+        }
+        typer.echo(json.dumps(payload, indent=2))
+        return
+
+    typer.echo(f"Registered:   {name}")
+    typer.echo(f"Type:         {project_type}")
+    typer.echo(f"Memory:       {mem_path}")
+    if ev_path is not None:
+        typer.echo(f"Evidence:     {ev_path}")
+    typer.echo(f"Registry:     {reg_path}")
+    typer.echo(f"Total:        {len(updated.projects)} project(s) in registry")
+    typer.echo("  read_only: true · applied: false")
+
+
 @ai_app.command("config")
 def ai_config() -> None:
     """Display the effective AI configuration for the current project."""
