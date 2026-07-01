@@ -38,6 +38,7 @@ reclaim_stage_app = typer.Typer(help="Recovery stage model commands.")
 reclaim_evidence_app = typer.Typer(help="Recovery evidence engine commands.")
 memory_app = typer.Typer(help="Memory Layer — read and inspect local audit records.")
 build_app = typer.Typer(help="Build Rail — plan and scaffold AEOS-native projects.")
+ui_app = typer.Typer(help="UI commands — generate static dashboards.")
 app.add_typer(project_app, name="project")
 app.add_typer(ai_app, name="ai")
 app.add_typer(sovereignty_app, name="sovereignty")
@@ -50,6 +51,7 @@ reclaim_app.add_typer(reclaim_stage_app, name="stage")
 reclaim_app.add_typer(reclaim_evidence_app, name="evidence")
 app.add_typer(memory_app, name="memory")
 app.add_typer(build_app, name="build")
+app.add_typer(ui_app, name="ui")
 
 REQUIRED_TOOLS = ["python", "uv", "git", "docker", "node", "pnpm", "gh", "code"]
 
@@ -3055,4 +3057,59 @@ def reclaim_evidence_summary_cmd(
         )
     typer.echo("")
     typer.echo("  Use: aeos reclaim evidence report --stage <stage_id>")
+    typer.echo("  read_only: true  ·  applied: false")
+
+
+# ---------------------------------------------------------------------------
+# ui dashboard
+# ---------------------------------------------------------------------------
+
+
+@ui_app.command("dashboard")
+def ui_dashboard(
+    memory_dir: str = typer.Option(
+        ..., "--memory-dir", help="Directory containing local memory records."
+    ),
+    project: str = typer.Option(
+        ..., "--project", help="Project name to build the dashboard for."
+    ),
+    output: str = typer.Option(
+        ..., "--output", "-o", help="Write the HTML dashboard to this file."
+    ),
+    overwrite: bool = typer.Option(
+        False,
+        "--overwrite",
+        help="Overwrite the output file if it already exists.",
+    ),
+) -> None:
+    """Generate a static HTML dashboard from local memory records (read-only)."""
+    from aeos.ui.dashboard import load_dashboard_data, render_dashboard
+
+    mem_path = Path(memory_dir)
+    output_path = Path(output)
+
+    if output_path.exists() and not overwrite:
+        typer.echo(
+            f"Error: '{output_path}' already exists. Use --overwrite to replace it.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    try:
+        data = load_dashboard_data(mem_path, project)
+    except FileNotFoundError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    html = render_dashboard(data)
+    output_path.write_text(html, encoding="utf-8")
+
+    typer.echo(f"Dashboard:  {output_path}")
+    typer.echo(f"Project:    {data.project_name}")
+    typer.echo(f"Records:    {len(data.records)}")
+    typer.echo("Read-only — no files modified, no migration applied.")
     typer.echo("  read_only: true  ·  applied: false")
