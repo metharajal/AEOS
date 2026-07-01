@@ -39,6 +39,9 @@ reclaim_evidence_app = typer.Typer(help="Recovery evidence engine commands.")
 memory_app = typer.Typer(help="Memory Layer — read and inspect local audit records.")
 build_app = typer.Typer(help="Build Rail — plan and scaffold AEOS-native projects.")
 ui_app = typer.Typer(help="UI commands — generate static dashboards.")
+workspace_app = typer.Typer(
+    help="Workspace commands — generate full project workspaces."
+)
 app.add_typer(project_app, name="project")
 app.add_typer(ai_app, name="ai")
 app.add_typer(sovereignty_app, name="sovereignty")
@@ -52,6 +55,7 @@ reclaim_app.add_typer(reclaim_evidence_app, name="evidence")
 app.add_typer(memory_app, name="memory")
 app.add_typer(build_app, name="build")
 app.add_typer(ui_app, name="ui")
+app.add_typer(workspace_app, name="workspace")
 
 REQUIRED_TOOLS = ["python", "uv", "git", "docker", "node", "pnpm", "gh", "code"]
 
@@ -3578,5 +3582,70 @@ def ui_portfolio(
     typer.echo(f"Projects:   {len(data.projects)}")
     for entry in data.projects:
         typer.echo(f"  {entry.project_name}  →  {entry.verdict}")
+    typer.echo("Read-only — no files modified, no migration applied.")
+    typer.echo("  read_only: true  ·  applied: false")
+
+
+# ---------------------------------------------------------------------------
+# workspace demo
+# ---------------------------------------------------------------------------
+
+
+@workspace_app.command("demo")
+def workspace_demo(
+    registry: str = typer.Option(
+        ...,
+        "--registry",
+        help="Path to the AEOS project registry JSON file.",
+    ),
+    output_dir: str = typer.Option(
+        ...,
+        "--output-dir",
+        help="Directory to write the full workspace into.",
+    ),
+    overwrite: bool = typer.Option(
+        False,
+        "--overwrite",
+        help="Overwrite existing output files.",
+    ),
+) -> None:
+    """Generate a full static workspace from a project registry (read-only).
+
+    Produces: index.html (portfolio) + per-project dashboard, workspace,
+    and evidence-pack for every registered project.
+    """
+    from aeos.workspace.demo import generate_workspace_demo
+
+    reg_path = Path(registry)
+    out_path = Path(output_dir)
+
+    try:
+        result = generate_workspace_demo(reg_path, out_path, overwrite)
+    except FileNotFoundError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+
+    typer.echo(f"Workspace:  {result.output_dir}")
+    typer.echo(f"Registry:   {result.registry_path}")
+    typer.echo(f"Portfolio:  {result.portfolio}")
+    typer.echo(
+        f"Projects:   {result.generated_count} generated"
+        f"  ·  {result.skipped_count} skipped"
+    )
+    for proj in result.projects:
+        if proj.skipped:
+            typer.echo(
+                f"  [SKIP] {proj.name}  (memory_dir missing: {proj.skip_reason})"
+            )
+        else:
+            typer.echo(f"  [OK]   {proj.name}  →  {proj.output_dir}")
+    if result.warnings:
+        typer.echo("")
+        typer.echo("Warnings:")
+        for w in result.warnings:
+            typer.echo(f"  ! {w}")
     typer.echo("Read-only — no files modified, no migration applied.")
     typer.echo("  read_only: true  ·  applied: false")
