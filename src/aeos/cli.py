@@ -239,6 +239,265 @@ def project_inspect(
     typer.echo(f"{'remote origin':<30} {remote}")
 
 
+# ---------------------------------------------------------------------------
+# project register
+# ---------------------------------------------------------------------------
+
+
+@project_app.command("register")
+def project_register(
+    name: str = typer.Option(..., "--name", help="Project name."),
+    memory_dir: str = typer.Option(
+        ..., "--memory-dir", help="Path to the project's local memory directory."
+    ),
+    evidence_dir: str = typer.Option(
+        "",
+        "--evidence-dir",
+        help="Path to the project's evidence output directory (optional).",
+    ),
+    project_type: str = typer.Option(
+        "recovered-project",
+        "--type",
+        "-t",
+        help="Project type (e.g. recovered-project, audited-project).",
+    ),
+    registry: str = typer.Option(
+        "",
+        "--registry",
+        help="Registry file path (default: ~/.aeos/registry.json).",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Register or update a project in the local AEOS project registry."""
+    from aeos.project.registry import (
+        DEFAULT_REGISTRY,
+        ProjectRegistration,
+    )
+    from aeos.project.registry import (
+        register_project as _register,
+    )
+
+    mem_path = Path(memory_dir)
+    if not mem_path.exists():
+        typer.echo(f"Error: memory directory '{memory_dir}' does not exist.", err=True)
+        raise typer.Exit(code=1)
+
+    ev_path: Path | None = None
+    if evidence_dir:
+        ev_path = Path(evidence_dir)
+        if not ev_path.exists():
+            typer.echo(
+                f"Error: evidence directory '{evidence_dir}' does not exist.", err=True
+            )
+            raise typer.Exit(code=1)
+
+    reg_path = Path(registry) if registry else DEFAULT_REGISTRY
+
+    registration = ProjectRegistration(
+        name=name,
+        project_type=project_type,
+        memory_dir=mem_path,
+        evidence_dir=ev_path,
+    )
+
+    updated, created = _register(registration, reg_path)
+
+    if as_json:
+        payload: dict[str, object] = {
+            "registered": True,
+            "created": created,
+            "name": registration.name,
+            "type": registration.project_type,
+            "memory_dir": str(registration.memory_dir),
+            "evidence_dir": (
+                str(registration.evidence_dir)
+                if registration.evidence_dir is not None
+                else None
+            ),
+            "registered_at": registration.registered_at,
+            "last_seen_at": registration.last_seen_at,
+            "local_only": registration.local_only,
+            "read_only": registration.read_only,
+            "registry": str(reg_path),
+            "total_projects": len(updated.projects),
+        }
+        typer.echo(json.dumps(payload, indent=2))
+        return
+
+    action = "Registered" if created else "Updated"
+    typer.echo(f"{action}:     {name}")
+    typer.echo(f"Type:         {project_type}")
+    typer.echo(f"Memory:       {mem_path}")
+    if ev_path is not None:
+        typer.echo(f"Evidence:     {ev_path}")
+    typer.echo(f"Last seen:    {registration.last_seen_at}")
+    typer.echo(f"Registry:     {reg_path}")
+    typer.echo(f"Total:        {len(updated.projects)} project(s) in registry")
+    typer.echo("  read_only: true · applied: false")
+
+
+# ---------------------------------------------------------------------------
+# project list
+# ---------------------------------------------------------------------------
+
+
+@project_app.command("list")
+def project_list(
+    registry: str = typer.Option(
+        "",
+        "--registry",
+        help="Registry file path (default: ~/.aeos/registry.json).",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """List all projects in the local AEOS project registry."""
+    from aeos.project.registry import DEFAULT_REGISTRY, load_registry
+
+    reg_path = Path(registry) if registry else DEFAULT_REGISTRY
+
+    if not reg_path.exists():
+        if as_json:
+            typer.echo(
+                json.dumps(
+                    {
+                        "registry": str(reg_path),
+                        "projects": [],
+                        "total": 0,
+                        "local_only": True,
+                        "read_only": True,
+                    },
+                    indent=2,
+                )
+            )
+            return
+        typer.echo(f"Registry not found: {reg_path}")
+        typer.echo("  Run 'aeos project register' to create it.")
+        typer.echo("  read_only: true · applied: false")
+        return
+
+    data = load_registry(reg_path)
+
+    if as_json:
+        typer.echo(
+            json.dumps(
+                {
+                    "registry": str(reg_path),
+                    "total": len(data.projects),
+                    "local_only": True,
+                    "read_only": True,
+                    "projects": [
+                        {
+                            "name": p.name,
+                            "type": p.project_type,
+                            "memory_dir": str(p.memory_dir),
+                            "evidence_dir": (
+                                str(p.evidence_dir)
+                                if p.evidence_dir is not None
+                                else None
+                            ),
+                            "registered_at": p.registered_at,
+                            "last_seen_at": p.last_seen_at,
+                            "local_only": p.local_only,
+                            "read_only": p.read_only,
+                        }
+                        for p in data.projects
+                    ],
+                },
+                indent=2,
+            )
+        )
+        return
+
+    typer.echo(
+        f"Registry: {reg_path}"
+        f"  ·  {len(data.projects)} project(s)"
+        "  ·  local-only  ·  read-only"
+    )
+
+    if not data.projects:
+        typer.echo("")
+        typer.echo("  No projects registered yet.")
+        typer.echo("  Run 'aeos project register --name <name> --memory-dir <path>'")
+        typer.echo("  read_only: true · applied: false")
+        return
+
+    typer.echo("")
+    col = f"  {'NAME':<30}  {'TYPE':<22}  LAST SEEN"
+    typer.echo(col)
+    typer.echo("  " + "─" * 70)
+    for p in data.projects:
+        last = p.last_seen_at[:10] if p.last_seen_at else "—"
+        typer.echo(f"  {p.name:<30}  {p.project_type:<22}  {last}")
+    typer.echo("")
+    typer.echo("  read_only: true · applied: false")
+
+
+# ---------------------------------------------------------------------------
+# project show
+# ---------------------------------------------------------------------------
+
+
+@project_app.command("show")
+def project_show(
+    name: str = typer.Option(..., "--name", help="Project name to show."),
+    registry: str = typer.Option(
+        "",
+        "--registry",
+        help="Registry file path (default: ~/.aeos/registry.json).",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Show details for a registered project."""
+    from aeos.project.registry import DEFAULT_REGISTRY, find_project, load_registry
+
+    reg_path = Path(registry) if registry else DEFAULT_REGISTRY
+    data = load_registry(reg_path)
+    entry = find_project(data, name)
+
+    if entry is None:
+        typer.echo(f"Error: project '{name}' not found in registry.", err=True)
+        typer.echo(f"  Registry: {reg_path}", err=True)
+        typer.echo(
+            "  Run 'aeos project list' to see all registered projects.", err=True
+        )
+        raise typer.Exit(code=1)
+
+    if as_json:
+        typer.echo(
+            json.dumps(
+                {
+                    "name": entry.name,
+                    "type": entry.project_type,
+                    "memory_dir": str(entry.memory_dir),
+                    "evidence_dir": (
+                        str(entry.evidence_dir)
+                        if entry.evidence_dir is not None
+                        else None
+                    ),
+                    "registered_at": entry.registered_at,
+                    "last_seen_at": entry.last_seen_at,
+                    "local_only": entry.local_only,
+                    "read_only": entry.read_only,
+                    "registry": str(reg_path),
+                },
+                indent=2,
+            )
+        )
+        return
+
+    typer.echo(f"Project:      {entry.name}")
+    typer.echo(f"Type:         {entry.project_type}")
+    typer.echo(f"Memory:       {entry.memory_dir}")
+    if entry.evidence_dir is not None:
+        typer.echo(f"Evidence:     {entry.evidence_dir}")
+    typer.echo(f"Registered:   {entry.registered_at}")
+    typer.echo(f"Last seen:    {entry.last_seen_at}")
+    typer.echo(f"Local only:   {str(entry.local_only).lower()}")
+    typer.echo(f"Read only:    {str(entry.read_only).lower()}")
+    typer.echo(f"Registry:     {reg_path}")
+    typer.echo("  read_only: true · applied: false")
+
+
 @ai_app.command("config")
 def ai_config() -> None:
     """Display the effective AI configuration for the current project."""
