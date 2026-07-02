@@ -1,8 +1,8 @@
 # AEOS Agent Roadmap
 
-**Version:** 1.2
-**Updated:** CAP-1 (2026-07-02)
-**Status:** UPDATED — reflects sprints as delivered through CAP-1
+**Version:** 1.3
+**Updated:** CAP-2 (2026-07-03)
+**Status:** UPDATED — reflects sprints as delivered through CAP-2
 
 ---
 
@@ -217,6 +217,50 @@ may already have violated it.
 
 ---
 
+## CAP-2 — Project Brain MVP
+
+**Status:** COMPLETE
+**Branch:** `cap1/sprint-a`
+**PR:** #85 · `84b8042`
+
+**What was built:**
+
+- **CAP-2-A — Brain Schema & Persistence**
+  - `BrainStore` : SQLite WAL, foreign keys ON, FTS5 with graceful degradation
+  - Models: `KnowledgeFact`, `Decision`, `VocabularyTerm`, `InteractionRecord`, `ProjectIdentity`, `BrainStatus`
+  - Deterministic version ID: SHA-256 of sorted fact IDs
+  - CLI: `aeos brain init`, `aeos brain status`
+
+- **CAP-2-B — Brain Extractor: MemoryRecord → KnowledgeFacts**
+  - `BrainExtractor.build()`: scans `memory_dir/<project>/`, INSERT OR IGNORE idempotent
+  - Deterministic IDs (`{record_id}::timeline`, `::critical`, `::provider::{name}`, …)
+  - `project_path` never in KnowledgeFact summaries or details
+  - CLI: `aeos brain build`
+
+- **CAP-2-C — Context Assembler & Security Gate**
+  - `ContextAssembler.assemble()`: Brain → bounded `AIContext`, reproducible, no AI call
+  - Keyword-based dimension analysis; IDENTITY + TIMELINE always included; SECURITY + SOVEREIGNTY fallback
+  - Cross-dimension pull for CRITICAL and HIGH facts
+  - Security gate: `_looks_like_secret_value()` (heuristic) on every fact, decision, term
+  - CLI: `aeos brain context` (preview without AI call)
+
+- **CAP-2-D — Brain Ask: AIContext → Local AI → Interaction Log**
+  - `format_context_as_prompt()`: pure renderer; `project_path` never rendered; anti-hallucination clause always present
+  - `aeos brain ask`: local only (`provider="local"` hardcoded, no `--provider` flag); logs `InteractionRecord` after success only
+  - `brain context --json`: controlled serialization — `project_path` excluded from JSON output
+
+**Constraints met:**
+- No data leaves the machine (`provider="local"` hardcoded, no frontier option)
+- `project_path` excluded from both rendered prompt and JSON preview
+- Security gate applied at extraction and assembly (defence-in-depth heuristic)
+- Interaction log written only on AI success — never on failure
+- No direct repository reading in the AI call chain
+- 2290 tests, ruff + mypy strict clean
+
+**Closes:** Brain Layer — `MemoryRecord → KnowledgeFacts → AIContext → Local AI → InteractionLog`
+
+---
+
 ## MVP-AGENTS-7 — Controlled Local Model Integration
 
 **Status:** PLANNED
@@ -331,5 +375,6 @@ No agent sprint closes without all five gates satisfied.
 | MVP-AGENTS-6 | `aeos agent pr list/show` | Controlled PR management | No | COMPLETE |
 | MVP-AGENTS-6A | — | Evidence doc | No | COMPLETE |
 | CAP-1 | `aeos agent pr apply` | Human-gated Apply Engine | No | COMPLETE |
+| CAP-2 | `aeos brain init/build/context/ask` | Project Brain MVP | Ollama (local, CAP-2-D only) | COMPLETE |
 | MVP-AGENTS-7 | `aeos agent plan --model` | Local model plan | Ollama (local) | PLANNED |
 | MVP-AGENTS-8 | `aeos agent plan --escalate` | Frontier escalation | Claude / GPT-4 | PLANNED |
