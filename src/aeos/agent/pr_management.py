@@ -1,7 +1,9 @@
 """
-AEOS Agent PR Management — local, controlled, read-only proposal store.
+AEOS Agent PR Management — controlled proposal store.
 
-No GitHub API. No git commands. No network. No mutations.
+No GitHub API. No git commands. No network.
+ProposalRepository is read-only. The only write path in this module is
+update_proposal_status() — a controlled status transition from pending only.
 All proposals live under workspace/proposals/<id>/proposal.json.
 """
 
@@ -149,6 +151,62 @@ def render_proposal_list(proposals: list[Proposal]) -> str:
     return header + rows
 
 
+def update_proposal_status(
+    proposals_dir: Path,
+    proposal_id: str,
+    new_status: ProposalStatus,
+) -> Proposal:
+    """Transition a proposal's status. Only allowed from pending.
+
+    The only write path in this module. All other fields in proposal.json
+    are preserved exactly. The caller (apply engine) is responsible for
+    ensuring that the real action has succeeded before calling this function.
+
+    Raises:
+        FileNotFoundError: if proposals_dir/<proposal_id>/proposal.json does not exist.
+        ValueError: if the proposal JSON is invalid or status is not pending.
+    """
+    proposal_json = proposals_dir / proposal_id / "proposal.json"
+    if not proposal_json.exists():
+        raise FileNotFoundError(
+            f"Proposal '{proposal_id}' not found at {proposal_json}"
+        )
+
+    try:
+        raw = json.loads(proposal_json.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid JSON in {proposal_json}: {exc}") from exc
+
+    raw_status = raw.get("status", "")
+    try:
+        current_status = ProposalStatus(raw_status)
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid status '{raw_status}' in {proposal_json}. "
+            f"Allowed: {[s.value for s in ProposalStatus]}"
+        ) from exc
+
+    if current_status != ProposalStatus.pending:
+        raise ValueError(
+            f"Cannot transition proposal '{proposal_id}': "
+            f"current status is '{current_status.value}', expected 'pending'."
+        )
+
+    raw["status"] = new_status.value
+    proposal_json.write_text(json.dumps(raw, indent=2), encoding="utf-8")
+
+    diff_preview_raw = raw.get("diff_preview")
+    return Proposal(
+        id=str(raw.get("id", proposal_id)),
+        title=str(raw.get("title", "")),
+        status=new_status,
+        created_at=str(raw.get("created_at", "")),
+        summary=str(raw.get("summary", "")),
+        files=[str(f) for f in raw.get("files", [])],
+        diff_preview=str(diff_preview_raw) if diff_preview_raw is not None else None,
+    )
+
+
 def render_proposal_detail(proposal: Proposal) -> str:
     """Render the full detail of a proposal for terminal output."""
     lines: list[str] = []
@@ -178,7 +236,7 @@ def render_proposal_detail(proposal: Proposal) -> str:
         a("")
 
     a("Suggested command:")
-    a(f"  aeos workspace apply-pr {proposal.id}")
+    a(f"  aeos agent pr apply {proposal.id}")
     a("")
     a("read_only: true  ·  applied: false  ·  human validation required")
 

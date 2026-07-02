@@ -15,6 +15,7 @@ from aeos.agent.pr_management import (
     ProposalStatus,
     render_proposal_detail,
     render_proposal_list,
+    update_proposal_status,
 )
 from aeos.cli import app
 
@@ -400,7 +401,7 @@ class TestRenderProposalDetail:
 
     def test_suggested_command_present(self) -> None:
         output = render_proposal_detail(self._make_proposal(proposal_id="pr-001"))
-        assert "aeos workspace apply-pr pr-001" in output
+        assert "aeos agent pr apply pr-001" in output
 
     def test_read_only_statement_present(self) -> None:
         output = render_proposal_detail(self._make_proposal())
@@ -544,7 +545,7 @@ class TestCliAgentPrShow:
             ["agent", "pr", "show", "pr-001", "--proposals-dir", str(p_dir)],
         )
 
-        assert "aeos workspace apply-pr pr-001" in result.output
+        assert "aeos agent pr apply pr-001" in result.output
 
     def test_show_does_not_write_to_proposals_dir(self, tmp_path: Path) -> None:
         p_dir = tmp_path / "proposals"
@@ -657,3 +658,109 @@ class TestPrManagementSafety:
         assert "openai" not in output.lower()
         assert "ollama" not in output.lower()
         assert "llm" not in output.lower()
+
+
+# ---------------------------------------------------------------------------
+# update_proposal_status
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateProposalStatus:
+    def test_update_status_pending_to_applied_writes_json(self, tmp_path: Path) -> None:
+        p_dir = tmp_path / "proposals"
+        _write_proposal(p_dir, "pr-001")
+
+        update_proposal_status(p_dir, "pr-001", ProposalStatus.applied)
+
+        raw = json.loads((p_dir / "pr-001" / "proposal.json").read_text())
+        assert raw["status"] == "applied"
+
+    def test_update_status_returns_updated_proposal_object(
+        self, tmp_path: Path
+    ) -> None:
+        p_dir = tmp_path / "proposals"
+        _write_proposal(p_dir, "pr-001", title="fix: harden RLS")
+
+        result = update_proposal_status(p_dir, "pr-001", ProposalStatus.applied)
+
+        assert isinstance(result, Proposal)
+        assert result.status == ProposalStatus.applied
+        assert result.id == "pr-001"
+
+    def test_update_status_written_json_has_correct_status(
+        self, tmp_path: Path
+    ) -> None:
+        p_dir = tmp_path / "proposals"
+        _write_proposal(p_dir, "pr-001")
+
+        update_proposal_status(p_dir, "pr-001", ProposalStatus.dismissed)
+
+        raw = json.loads((p_dir / "pr-001" / "proposal.json").read_text())
+        assert raw["status"] == "dismissed"
+
+    def test_update_status_already_applied_raises_value_error(
+        self, tmp_path: Path
+    ) -> None:
+        p_dir = tmp_path / "proposals"
+        _write_proposal(p_dir, "pr-001", status="applied")
+
+        with pytest.raises(ValueError, match="pending"):
+            update_proposal_status(p_dir, "pr-001", ProposalStatus.applied)
+
+    def test_update_status_dismissed_raises_value_error(self, tmp_path: Path) -> None:
+        p_dir = tmp_path / "proposals"
+        _write_proposal(p_dir, "pr-001", status="dismissed")
+
+        with pytest.raises(ValueError, match="pending"):
+            update_proposal_status(p_dir, "pr-001", ProposalStatus.applied)
+
+    def test_update_status_missing_proposal_raises_file_not_found(
+        self, tmp_path: Path
+    ) -> None:
+        p_dir = tmp_path / "proposals"
+
+        with pytest.raises(FileNotFoundError):
+            update_proposal_status(p_dir, "does-not-exist", ProposalStatus.applied)
+
+    def test_update_status_preserves_all_other_fields(self, tmp_path: Path) -> None:
+        p_dir = tmp_path / "proposals"
+        _write_proposal(
+            p_dir,
+            "pr-001",
+            title="fix: RLS hardening",
+            summary="Harden all policies for production.",
+            files=["src/auth/rls.sql", "migrations/001.sql"],
+            created_at="2026-07-02T10:00:00",
+            diff_preview="--- a\n+++ b\n+ added",
+        )
+
+        result = update_proposal_status(p_dir, "pr-001", ProposalStatus.applied)
+
+        assert result.title == "fix: RLS hardening"
+        assert result.summary == "Harden all policies for production."
+        assert result.files == ["src/auth/rls.sql", "migrations/001.sql"]
+        assert result.created_at == "2026-07-02T10:00:00"
+        assert result.diff_preview == "--- a\n+++ b\n+ added"
+        assert result.id == "pr-001"
+
+    def test_update_status_result_parseable_by_repository(self, tmp_path: Path) -> None:
+        p_dir = tmp_path / "proposals"
+        _write_proposal(p_dir, "pr-001")
+
+        update_proposal_status(p_dir, "pr-001", ProposalStatus.applied)
+
+        repo = ProposalRepository(p_dir)
+        proposal = repo.get("pr-001")
+        assert proposal is not None
+        assert proposal.status == ProposalStatus.applied
+
+    def test_update_status_never_writes_when_not_pending(self, tmp_path: Path) -> None:
+        p_dir = tmp_path / "proposals"
+        _write_proposal(p_dir, "pr-001", status="applied")
+        before = {f: f.read_bytes() for f in p_dir.rglob("*") if f.is_file()}
+
+        with pytest.raises(ValueError):
+            update_proposal_status(p_dir, "pr-001", ProposalStatus.applied)
+
+        after = {f: f.read_bytes() for f in p_dir.rglob("*") if f.is_file()}
+        assert before == after
