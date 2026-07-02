@@ -85,13 +85,13 @@ timeout = 5
 
 [[checks]]
 name = "Default local provider is openai-compatible in config.py"
-command = ["grep", "-n", "openai-compatible", "src/aeos/ai/config.py"]
+command = ["grep", "-n", "_DEFAULT_LOCAL_PROVIDER.*openai-compatible", "src/aeos/ai/config.py"]
 expect_exit = 0
 timeout = 5
 
 [[checks]]
-name = "aeos.toml declares openai-compatible as local provider"
-command = ["grep", "-n", "openai-compatible", "aeos.toml"]
+name = "aeos.toml [ai.local].provider is openai-compatible"
+command = ["python", "-c", "import tomllib,sys; d=tomllib.loads(open('aeos.toml').read()); sys.exit(0 if d.get('ai',{}).get('local',{}).get('provider')=='openai-compatible' else 1)"]
 expect_exit = 0
 timeout = 5
 
