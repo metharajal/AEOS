@@ -1,0 +1,112 @@
+# CAP-2-E Verification Spec
+# Written BEFORE the sprint code — not after.
+# Each check is a deterministic, reproducible shell-free command.
+# An agent cannot influence the result of grep, pytest, or ruff.
+
+[sprint]
+id = "CAP-2-E"
+description = "Local AI runtime is provider-agnostic — replaceable by configuration"
+
+# ---------------------------------------------------------------------------
+# Quality gates
+# ---------------------------------------------------------------------------
+
+[[checks]]
+name = "pytest passes"
+command = ["pytest", "tests/", "-q", "--tb=short"]
+expect_exit = 0
+timeout = 120
+
+[[checks]]
+name = "ruff clean"
+command = ["ruff", "check", "src/"]
+expect_exit = 0
+timeout = 30
+
+[[checks]]
+name = "mypy clean"
+command = ["mypy", "src/"]
+expect_exit = 0
+timeout = 60
+
+# ---------------------------------------------------------------------------
+# Invariant: Ollama-specific coupling removed from local.py
+# ---------------------------------------------------------------------------
+
+[[checks]]
+name = "No 'Ollama unreachable' error message in local.py"
+command = ["grep", "-ni", "ollama unreachable", "src/aeos/ai/local.py"]
+expect_exit = 1
+timeout = 5
+
+[[checks]]
+name = "No provider guard (provider != ollama) in local.py"
+command = ["grep", "-nEi", "provider.*!=.*ollama", "src/aeos/ai/local.py"]
+expect_exit = 1
+timeout = 5
+
+[[checks]]
+name = "No Ollama-native endpoint /api/generate in local.py"
+command = ["grep", "-n", "api/generate", "src/aeos/ai/local.py"]
+expect_exit = 1
+timeout = 5
+
+# ---------------------------------------------------------------------------
+# Invariant: OpenAI-compatible protocol adopted
+# ---------------------------------------------------------------------------
+
+[[checks]]
+name = "OpenAI-compatible endpoint /v1/chat/completions in local.py"
+command = ["grep", "-n", "v1/chat/completions", "src/aeos/ai/local.py"]
+expect_exit = 0
+timeout = 5
+
+[[checks]]
+name = "Request uses messages format (not prompt) in local.py"
+command = ["grep", "-n", "messages", "src/aeos/ai/local.py"]
+expect_exit = 0
+timeout = 5
+
+[[checks]]
+name = "Generic health-check /v1/models in doctor.py"
+command = ["grep", "-n", "v1/models", "src/aeos/ai/doctor.py"]
+expect_exit = 0
+timeout = 5
+
+[[checks]]
+name = "No Ollama-specific /api/tags health-check in doctor.py"
+command = ["grep", "-n", "api/tags", "src/aeos/ai/doctor.py"]
+expect_exit = 1
+timeout = 5
+
+# ---------------------------------------------------------------------------
+# Invariant: default provider is a concept, not a tool name
+# ---------------------------------------------------------------------------
+
+[[checks]]
+name = "Default local provider is openai-compatible in config.py"
+command = ["grep", "-n", "_DEFAULT_LOCAL_PROVIDER.*openai-compatible", "src/aeos/ai/config.py"]
+expect_exit = 0
+timeout = 5
+
+[[checks]]
+name = "aeos.toml [ai.local].provider is openai-compatible"
+command = ["python", "-c", "import tomllib,sys; d=tomllib.loads(open('aeos.toml').read()); sys.exit(0 if d.get('ai',{}).get('local',{}).get('provider')=='openai-compatible' else 1)"]
+expect_exit = 0
+timeout = 5
+
+# ---------------------------------------------------------------------------
+# Invariant: Project Brain untouched
+# ---------------------------------------------------------------------------
+
+[[checks]]
+name = "brain/assembler.py not modified — no local.py import"
+command = ["grep", "-n", "from aeos.ai.local", "src/aeos/brain/assembler.py"]
+expect_exit = 1
+timeout = 5
+
+[[checks]]
+name = "brain/prompt.py not modified — no local.py import"
+command = ["grep", "-n", "from aeos.ai.local", "src/aeos/brain/prompt.py"]
+expect_exit = 1
+timeout = 5

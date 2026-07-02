@@ -57,6 +57,9 @@ agent_pr_app = typer.Typer(
 brain_app = typer.Typer(
     help="Project Brain — local sovereign knowledge store. Zero AI, zero network."
 )
+verify_app = typer.Typer(
+    help="Verify — run sprint proofs. Deterministic, local, no AI."
+)
 agent_app.add_typer(agent_pr_app, name="pr")
 app.add_typer(project_app, name="project")
 app.add_typer(ai_app, name="ai")
@@ -74,6 +77,7 @@ app.add_typer(ui_app, name="ui")
 app.add_typer(workspace_app, name="workspace")
 app.add_typer(agent_app, name="agent")
 app.add_typer(brain_app, name="brain")
+app.add_typer(verify_app, name="verify")
 
 REQUIRED_TOOLS = ["python", "uv", "git", "docker", "node", "pnpm", "gh", "code"]
 
@@ -4427,3 +4431,92 @@ def brain_build_cmd(
     typer.echo(f"Facts inserted:    {result.facts_inserted}")
     typer.echo("")
     typer.echo("  sovereign: true  ·  offline: true  ·  local-first: true")
+
+
+# ---------------------------------------------------------------------------
+# Verify commands
+# ---------------------------------------------------------------------------
+
+
+@verify_app.command("sprint")
+def verify_sprint_cmd(
+    sprint_id: str = typer.Argument(..., help="Sprint ID (e.g. cap-2-e)."),
+    spec_path: str = typer.Option(
+        "",
+        "--spec",
+        help="Path to .verify.toml spec. Default: .aeos/verification/<id>.verify.toml",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Run a sprint verification spec — deterministic, local, no AI.
+
+    Each check in the spec is a reproducible command.
+    Exit 0 if all checks pass, exit 1 if any fail.
+    """
+    from aeos.verify.runner import run_verification
+    from aeos.verify.spec import load_spec
+
+    if spec_path:
+        resolved = Path(spec_path)
+    else:
+        resolved = Path(".aeos") / "verification" / f"{sprint_id.lower()}.verify.toml"
+
+    try:
+        spec = load_spec(resolved)
+    except FileNotFoundError:
+        typer.echo(f"Error: spec not found: {resolved}", err=True)
+        raise typer.Exit(code=1) from None
+    except ValueError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(code=1) from None
+
+    results = run_verification(spec)
+    passed = sum(1 for r in results if r.passed)
+    total = len(results)
+    all_passed = passed == total
+
+    if as_json:
+        output = {
+            "sprint_id": spec.sprint_id,
+            "description": spec.description,
+            "passed": passed,
+            "total": total,
+            "all_passed": all_passed,
+            "checks": [
+                {
+                    "name": r.name,
+                    "command": r.command,
+                    "expect_exit": r.expect_exit,
+                    "actual_exit": r.actual_exit,
+                    "passed": r.passed,
+                    "output": r.output,
+                    "error": r.error,
+                }
+                for r in results
+            ],
+        }
+        typer.echo(json.dumps(output, indent=2))
+        if not all_passed:
+            raise typer.Exit(code=1)
+        return
+
+    width = max((len(r.name) for r in results), default=20) + 2
+    header = f"{spec.sprint_id} — {spec.description}"
+    typer.echo(header)
+    typer.echo("=" * len(header))
+    for r in results:
+        badge = "[PASS]" if r.passed else "[FAIL]"
+        if r.error:
+            detail = f"error: {r.error}"
+        else:
+            detail = f"exit={r.actual_exit}"
+            if not r.passed:
+                detail += f"  expected={r.expect_exit}"
+            first_line = r.output.splitlines()[0] if r.output.strip() else ""
+            if first_line:
+                detail += f"  {first_line[:60]}"
+        typer.echo(f"{badge} {r.name:<{width}} {detail}")
+    typer.echo("-" * len(header))
+    typer.echo(f"Result: {passed}/{total} PASS")
+    if not all_passed:
+        raise typer.Exit(code=1)

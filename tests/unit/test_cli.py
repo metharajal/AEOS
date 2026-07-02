@@ -297,7 +297,7 @@ def test_ai_config_defaults(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "Source: (defaults)" in result.output
     assert "local-first" in result.output
-    assert "ollama" in result.output
+    assert "openai-compatible" in result.output
     assert "AEOS_FRONTIER_API_KEY" in result.output
 
 
