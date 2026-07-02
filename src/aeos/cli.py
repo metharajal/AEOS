@@ -4006,3 +4006,110 @@ def agent_pr_show_cmd(
         raise typer.Exit(code=1)
 
     typer.echo(render_proposal_detail(proposal))
+
+
+# ---------------------------------------------------------------------------
+# agent pr apply — evidence-first human-gated proposal apply
+# ---------------------------------------------------------------------------
+
+
+@agent_pr_app.command("apply")
+def agent_pr_apply_cmd(
+    proposal_id: str = typer.Argument(..., help="Proposal ID to apply."),
+    proposals_dir: str = typer.Option(
+        "",
+        "--proposals-dir",
+        help="Path to proposals directory (default: ~/.aeos/workspace/proposals/).",
+    ),
+    memory_dir: str = typer.Option(
+        "",
+        "--memory-dir",
+        help="Path to memory directory for the MemoryRecord (default: ~/.aeos/memory).",
+    ),
+    project_name: str = typer.Option(
+        "",
+        "--project-name",
+        help="Project name for the MemoryRecord (default: proposal directory name).",
+    ),
+    project_path: str = typer.Option(
+        "",
+        "--project-path",
+        help="Project path for the MemoryRecord (default: current directory).",
+    ),
+) -> None:
+    """Apply a local PR proposal after human confirmation.
+
+    Displays the proposal, then waits for the human to type exactly:
+      APPLY <proposal-id>
+
+    Any other input exits with code 0 and writes nothing.
+    """
+    from aeos.agent.apply_engine import ApplyContext, run_apply
+    from aeos.agent.pr_management import (
+        DEFAULT_PROPOSALS_DIR,
+        ProposalRepository,
+        ProposalStatus,
+        render_proposal_detail,
+    )
+
+    _DEFAULT_MEMORY_DIR = Path.home() / ".aeos" / "memory"
+
+    p_dir = Path(proposals_dir) if proposals_dir else DEFAULT_PROPOSALS_DIR
+    mem_dir = Path(memory_dir) if memory_dir else _DEFAULT_MEMORY_DIR
+    proj_path = project_path if project_path else str(Path(".").resolve())
+    repo = ProposalRepository(p_dir)
+
+    try:
+        proposal = repo.get(proposal_id)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if proposal is None:
+        typer.echo(f"Error: Proposal '{proposal_id}' not found.", err=True)
+        raise typer.Exit(code=1)
+
+    if proposal.status != ProposalStatus.pending:
+        typer.echo(
+            f"Error: Proposal '{proposal_id}' has status '{proposal.status.value}',"
+            " expected 'pending'.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    proj_name = project_name if project_name else p_dir.name
+
+    typer.echo(render_proposal_detail(proposal))
+    typer.echo("")
+    typer.echo("─" * 60)
+    typer.echo(f"To apply, type exactly:  APPLY {proposal_id}")
+    typer.echo("Any other input cancels without writing any file.")
+    typer.echo("─" * 60)
+
+    confirmation = typer.prompt("Confirmation")
+
+    expected = f"APPLY {proposal_id}"
+    if confirmation != expected:
+        typer.echo("Apply cancelled — no files written.")
+        raise typer.Exit(code=0)
+
+    ctx = ApplyContext(
+        proposal=proposal,
+        proposals_dir=p_dir,
+        memory_dir=mem_dir,
+        project_name=proj_name,
+        project_path=proj_path,
+        confirmation=confirmation,
+    )
+
+    try:
+        result = run_apply(ctx)
+    except (ValueError, OSError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    typer.echo("")
+    typer.echo("Applied successfully.")
+    typer.echo(f"  apply-log:     {result.apply_log_path}")
+    typer.echo(f"  memory-record: {result.memory_record_path}")
+    typer.echo("  human_validated: true  ·  applied: true  ·  read_only: false")

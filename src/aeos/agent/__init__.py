@@ -1,3 +1,8 @@
+from aeos.agent.apply_engine import (
+    ApplyContext,
+    ApplyResult,
+    run_apply,
+)
 from aeos.agent.planner import (
     AgentPlan,
     ProjectPlanEntry,
@@ -17,6 +22,8 @@ from aeos.agent.pr_proposal import (
 
 __all__ = [
     "AgentPlan",
+    "ApplyContext",
+    "ApplyResult",
     "PRProposal",
     "ProjectPlanEntry",
     "Proposal",
@@ -26,4 +33,5 @@ __all__ = [
     "generate_pr_proposal",
     "generate_pr_proposal_from_memory",
     "generate_project_entry",
+    "run_apply",
 ]

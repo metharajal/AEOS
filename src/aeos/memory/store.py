@@ -203,6 +203,43 @@ def build_memory_record_from_reclaim_harden(
     )
 
 
+def build_memory_record_from_apply(
+    proposal_id: str,
+    project_name: str,
+    project_path: str,
+    apply_log_path: Path,
+) -> MemoryRecord:
+    """Build a safe MemoryRecord for a human-applied Proposal.
+
+    human_validated=True and applied=True because the human explicitly
+    typed the confirmation before this record is created.
+    """
+    now = datetime.now(tz=UTC)
+    ts = now.strftime("%Y%m%dT%H%M%S")
+    short_id = uuid.uuid4().hex[:8]
+    record_id = f"{project_name}-{ts}-{short_id}"
+
+    return MemoryRecord(
+        record_id=record_id,
+        created_at=now.isoformat(),
+        project_path=project_path,
+        project_name=project_name,
+        rail="agent",
+        command="agent pr apply",
+        status="OK",
+        generator=None,
+        providers=[],
+        control_level="controlled",
+        read_only=False,
+        applied=True,
+        findings_summary={},
+        remediation_summary=None,
+        strategic_options=[],
+        human_validated=True,
+        notes=f"Human confirmed APPLY {proposal_id} — apply-log: {apply_log_path}",
+    )
+
+
 def save_record(record: MemoryRecord, memory_dir: Path) -> Path:
     """Write record JSON to memory_dir/<project_name>/<record_id>.json.
 
