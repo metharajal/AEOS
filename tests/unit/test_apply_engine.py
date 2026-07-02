@@ -100,7 +100,7 @@ class TestBuildMemoryRecordFromApply:
             proposal_id="pr-001",
             project_name="proj",
             project_path="/private/tmp/proj",
-            apply_log_path=tmp_path / "apply-log.md",
+            apply_log_path=tmp_path / "apply-log.json",
         )
         assert record.rail == "agent"
 
@@ -109,7 +109,7 @@ class TestBuildMemoryRecordFromApply:
             proposal_id="pr-001",
             project_name="proj",
             project_path="/private/tmp/proj",
-            apply_log_path=tmp_path / "apply-log.md",
+            apply_log_path=tmp_path / "apply-log.json",
         )
         assert record.command == "agent pr apply"
 
@@ -118,7 +118,7 @@ class TestBuildMemoryRecordFromApply:
             proposal_id="pr-001",
             project_name="proj",
             project_path="/private/tmp/proj",
-            apply_log_path=tmp_path / "apply-log.md",
+            apply_log_path=tmp_path / "apply-log.json",
         )
         assert record.human_validated is True
 
@@ -127,7 +127,7 @@ class TestBuildMemoryRecordFromApply:
             proposal_id="pr-001",
             project_name="proj",
             project_path="/private/tmp/proj",
-            apply_log_path=tmp_path / "apply-log.md",
+            apply_log_path=tmp_path / "apply-log.json",
         )
         assert record.applied is True
 
@@ -136,7 +136,7 @@ class TestBuildMemoryRecordFromApply:
             proposal_id="pr-001",
             project_name="proj",
             project_path="/private/tmp/proj",
-            apply_log_path=tmp_path / "apply-log.md",
+            apply_log_path=tmp_path / "apply-log.json",
         )
         assert record.read_only is False
 
@@ -145,7 +145,7 @@ class TestBuildMemoryRecordFromApply:
             proposal_id="pr-001",
             project_name="proj",
             project_path="/private/tmp/proj",
-            apply_log_path=tmp_path / "apply-log.md",
+            apply_log_path=tmp_path / "apply-log.json",
         )
         assert record.status == "OK"
 
@@ -154,7 +154,7 @@ class TestBuildMemoryRecordFromApply:
             proposal_id="pr-001",
             project_name="my-app",
             project_path="/private/tmp/proj",
-            apply_log_path=tmp_path / "apply-log.md",
+            apply_log_path=tmp_path / "apply-log.json",
         )
         assert record.project_name == "my-app"
 
@@ -163,7 +163,7 @@ class TestBuildMemoryRecordFromApply:
             proposal_id="pr-001",
             project_name="proj",
             project_path="/srv/my-app",
-            apply_log_path=tmp_path / "apply-log.md",
+            apply_log_path=tmp_path / "apply-log.json",
         )
         assert record.project_path == "/srv/my-app"
 
@@ -172,7 +172,7 @@ class TestBuildMemoryRecordFromApply:
             proposal_id="pr-abc",
             project_name="proj",
             project_path="/private/tmp/proj",
-            apply_log_path=tmp_path / "apply-log.md",
+            apply_log_path=tmp_path / "apply-log.json",
         )
         assert record.notes is not None
         assert "pr-abc" in record.notes
@@ -182,7 +182,7 @@ class TestBuildMemoryRecordFromApply:
             proposal_id="pr-001",
             project_name="proj",
             project_path="/private/tmp/proj",
-            apply_log_path=tmp_path / "apply-log.md",
+            apply_log_path=tmp_path / "apply-log.json",
         )
         assert record.record_id != ""
 
@@ -191,7 +191,7 @@ class TestBuildMemoryRecordFromApply:
             proposal_id="pr-001",
             project_name="proj",
             project_path="/private/tmp/proj",
-            apply_log_path=tmp_path / "apply-log.md",
+            apply_log_path=tmp_path / "apply-log.json",
         )
         assert record.created_at != ""
 
@@ -202,13 +202,13 @@ class TestBuildMemoryRecordFromApply:
 
 
 class TestRunApplySuccess:
-    def test_writes_apply_log_md(self, tmp_path: Path) -> None:
+    def test_writes_apply_log_json(self, tmp_path: Path) -> None:
         p_dir = tmp_path / "proposals"
         ctx = _make_context(p_dir, tmp_path / "memory")
 
         run_apply(ctx)
 
-        assert (p_dir / "pr-001" / "apply-log.md").exists()
+        assert (p_dir / "pr-001" / "apply-log.json").exists()
 
     def test_apply_log_contains_proposal_id(self, tmp_path: Path) -> None:
         p_dir = tmp_path / "proposals"
@@ -216,7 +216,7 @@ class TestRunApplySuccess:
 
         run_apply(ctx)
 
-        content = (p_dir / "pr-007" / "apply-log.md").read_text()
+        content = (p_dir / "pr-007" / "apply-log.json").read_text()
         assert "pr-007" in content
 
     def test_apply_log_contains_proposal_title(self, tmp_path: Path) -> None:
@@ -225,7 +225,7 @@ class TestRunApplySuccess:
 
         run_apply(ctx)
 
-        content = (p_dir / "pr-001" / "apply-log.md").read_text()
+        content = (p_dir / "pr-001" / "apply-log.json").read_text()
         assert "feat: add audit trail" in content
 
     def test_apply_log_contains_applied_at_timestamp(self, tmp_path: Path) -> None:
@@ -234,8 +234,8 @@ class TestRunApplySuccess:
 
         run_apply(ctx)
 
-        content = (p_dir / "pr-001" / "apply-log.md").read_text()
-        assert "Applied at:" in content
+        content = (p_dir / "pr-001" / "apply-log.json").read_text()
+        assert '"applied_at"' in content
 
     def test_apply_log_contains_confirmation_string(self, tmp_path: Path) -> None:
         p_dir = tmp_path / "proposals"
@@ -243,35 +243,35 @@ class TestRunApplySuccess:
 
         run_apply(ctx)
 
-        content = (p_dir / "pr-001" / "apply-log.md").read_text()
+        content = (p_dir / "pr-001" / "apply-log.json").read_text()
         assert "APPLY pr-001" in content
 
-    def test_apply_log_contains_applied_true(self, tmp_path: Path) -> None:
+    def test_apply_log_contains_human_confirmed_true(self, tmp_path: Path) -> None:
         p_dir = tmp_path / "proposals"
         ctx = _make_context(p_dir, tmp_path / "memory")
 
         run_apply(ctx)
 
-        content = (p_dir / "pr-001" / "apply-log.md").read_text()
-        assert "applied: true" in content
+        content = (p_dir / "pr-001" / "apply-log.json").read_text()
+        assert '"human_confirmed": true' in content
 
-    def test_apply_log_read_only_false(self, tmp_path: Path) -> None:
+    def test_apply_log_validation_result_passed(self, tmp_path: Path) -> None:
         p_dir = tmp_path / "proposals"
         ctx = _make_context(p_dir, tmp_path / "memory")
 
         run_apply(ctx)
 
-        content = (p_dir / "pr-001" / "apply-log.md").read_text()
-        assert "read_only: false" in content
+        content = (p_dir / "pr-001" / "apply-log.json").read_text()
+        assert '"validation_result": "passed"' in content
 
-    def test_apply_log_human_validated_true(self, tmp_path: Path) -> None:
+    def test_apply_log_applied_by_is_agent_pr_apply(self, tmp_path: Path) -> None:
         p_dir = tmp_path / "proposals"
         ctx = _make_context(p_dir, tmp_path / "memory")
 
         run_apply(ctx)
 
-        content = (p_dir / "pr-001" / "apply-log.md").read_text()
-        assert "human_validated: true" in content
+        content = (p_dir / "pr-001" / "apply-log.json").read_text()
+        assert "aeos agent pr apply" in content
 
     def test_proposal_json_status_updated_to_applied(self, tmp_path: Path) -> None:
         p_dir = tmp_path / "proposals"
@@ -341,7 +341,7 @@ class TestRunApplySuccess:
         result = run_apply(ctx)
 
         assert isinstance(result, ApplyResult)
-        assert result.apply_log_path == p_dir / "pr-001" / "apply-log.md"
+        assert result.apply_log_path == p_dir / "pr-001" / "apply-log.json"
         assert result.apply_log_path.exists()
         assert result.memory_record_path.exists()
 
@@ -363,18 +363,18 @@ class TestRunApplySuccess:
 
         run_apply(ctx)
 
-        content = (p_dir / "pr-001" / "apply-log.md").read_text()
+        content = (p_dir / "pr-001" / "apply-log.json").read_text()
         assert "src/auth/rls.sql" in content
         assert "migrations/001.sql" in content
 
-    def test_apply_log_no_files_shows_none(self, tmp_path: Path) -> None:
+    def test_apply_log_no_files_shows_empty_array(self, tmp_path: Path) -> None:
         p_dir = tmp_path / "proposals"
         ctx = _make_context(p_dir, tmp_path / "memory", files=[])
 
         run_apply(ctx)
 
-        content = (p_dir / "pr-001" / "apply-log.md").read_text()
-        assert "(none)" in content
+        payload = json.loads((p_dir / "pr-001" / "apply-log.json").read_text())
+        assert payload["files"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -482,6 +482,32 @@ class TestRunApplyGuards:
         with pytest.raises(ValueError):
             run_apply(ctx)
 
+    def test_rejects_if_apply_log_already_exists_raises_file_exists_error(
+        self, tmp_path: Path
+    ) -> None:
+        """APPLY.PRE.05: apply-log.json must not exist before apply runs."""
+        p_dir = tmp_path / "proposals"
+        _write_proposal_file(p_dir, "pr-001")
+        (p_dir / "pr-001" / "apply-log.json").write_text("{}", encoding="utf-8")
+        ctx = _make_context(p_dir, tmp_path / "memory")
+
+        with pytest.raises(FileExistsError):
+            run_apply(ctx)
+
+    def test_rejects_if_apply_log_exists_proposal_stays_pending(
+        self, tmp_path: Path
+    ) -> None:
+        p_dir = tmp_path / "proposals"
+        _write_proposal_file(p_dir, "pr-001")
+        (p_dir / "pr-001" / "apply-log.json").write_text("{}", encoding="utf-8")
+        ctx = _make_context(p_dir, tmp_path / "memory")
+
+        with pytest.raises(FileExistsError):
+            run_apply(ctx)
+
+        raw = json.loads((p_dir / "pr-001" / "proposal.json").read_text())
+        assert raw["status"] == "pending"
+
 
 # ---------------------------------------------------------------------------
 # run_apply — ordering invariant
@@ -489,15 +515,15 @@ class TestRunApplyGuards:
 
 
 class TestRunApplyOrdering:
-    def test_proposal_stays_pending_if_apply_log_write_fails(
+    def test_proposal_stays_pending_if_apply_log_guard_fires(
         self, tmp_path: Path
     ) -> None:
-        """Core ordering guarantee: if apply-log write fails, status stays pending."""
+        """Ordering guarantee: C2 guard (APPLY.PRE.05) fires before any write."""
         p_dir = tmp_path / "proposals"
         _write_proposal_file(p_dir, "pr-001")
 
-        # Block the write by placing a directory at apply-log.md's path
-        apply_log_blocker = p_dir / "pr-001" / "apply-log.md"
+        # Placing a directory at apply-log.json triggers .exists() → FileExistsError
+        apply_log_blocker = p_dir / "pr-001" / "apply-log.json"
         apply_log_blocker.mkdir(parents=True, exist_ok=True)
 
         proposal = _make_proposal()
@@ -510,7 +536,7 @@ class TestRunApplyOrdering:
             confirmation="APPLY pr-001",
         )
 
-        with pytest.raises(OSError):
+        with pytest.raises(OSError):  # FileExistsError is a subclass of OSError
             run_apply(ctx)
 
         raw = json.loads((p_dir / "pr-001" / "proposal.json").read_text())

@@ -236,7 +236,7 @@ def build_memory_record_from_apply(
         remediation_summary=None,
         strategic_options=[],
         human_validated=True,
-        notes=f"Applied proposal {proposal_id} — apply-log: {apply_log_path}",
+        notes=f"Human confirmed APPLY {proposal_id} — apply-log: {apply_log_path}",
     )
 
 

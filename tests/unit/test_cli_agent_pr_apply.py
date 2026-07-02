@@ -106,7 +106,7 @@ class TestCliAgentPrApplySuccess:
 
         _invoke_apply(tmp_path)
 
-        assert (p_dir / "pr-001" / "apply-log.md").exists()
+        assert (p_dir / "pr-001" / "apply-log.json").exists()
 
     def test_proposal_json_status_updated_to_applied(self, tmp_path: Path) -> None:
         p_dir = tmp_path / "proposals"
@@ -241,7 +241,7 @@ class TestCliAgentPrApplyWrongConfirmation:
             input="wrong\n",
         )
 
-        assert not (p_dir / "pr-001" / "apply-log.md").exists()
+        assert not (p_dir / "pr-001" / "apply-log.json").exists()
 
     def test_wrong_confirmation_does_not_change_proposal_status(
         self, tmp_path: Path
