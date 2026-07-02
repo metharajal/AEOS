@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from html import escape
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from aeos.memory.models import MemoryRecord
 from aeos.memory.timeline import (
@@ -16,6 +17,9 @@ from aeos.memory.timeline import (
     build_timeline,
     load_project_records,
 )
+
+if TYPE_CHECKING:
+    from aeos.agent.planner import ProjectPlanEntry
 
 _CSS = """
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -190,6 +194,7 @@ class WorkspaceData:
     recovery_progress: RecoveryProgress
     human_gates: list[str]
     next_actions: list[str]
+    agent_plan_entry: ProjectPlanEntry | None = field(default=None)
 
 
 # ---------------------------------------------------------------------------
@@ -399,6 +404,13 @@ def load_workspace_data(memory_dir: Path, project_name: str) -> WorkspaceData:
     gates = _derive_human_gates(last)
     actions = _derive_next_actions(last, pr)
 
+    from aeos.agent.planner import generate_project_entry
+
+    agent_entry = generate_project_entry(
+        name=project_name,
+        memory_dir=memory_dir,
+    )
+
     return WorkspaceData(
         project_name=project_name,
         records=records,
@@ -408,6 +420,7 @@ def load_workspace_data(memory_dir: Path, project_name: str) -> WorkspaceData:
         recovery_progress=progress,
         human_gates=gates,
         next_actions=actions,
+        agent_plan_entry=agent_entry,
     )
 
 
@@ -657,6 +670,63 @@ def _render_next_actions(data: WorkspaceData) -> str:
     )
 
 
+def _render_agent_recommendations(data: WorkspaceData) -> str:
+    entry = data.agent_plan_entry
+    if entry is None:
+        return "<p style='color:#6e7681'>Agent plan not available.</p>"
+
+    sc = _status_cls(entry.status)
+
+    header = (
+        "<div style='margin-bottom:12px'>"
+        "<span style='font-size:10px;color:#6e7681;text-transform:uppercase;"
+        "letter-spacing:0.08em'>Mode</span><br>"
+        "<span style='color:#58a6ff'>deterministic read-only planner</span>"
+        f"&nbsp;&nbsp;<span class='{sc}' style='font-weight:bold'>"
+        f"[{escape(entry.status)}]</span>"
+        "</div>"
+    )
+
+    risks_html = ""
+    if entry.risks:
+        items = "".join(
+            f"<div class='gate-item' style='color:#f85149'>{escape(r)}</div>"
+            for r in entry.risks
+        )
+        risks_html = (
+            "<div style='margin-bottom:10px'>"
+            "<span style='font-size:10px;color:#6e7681;text-transform:uppercase;"
+            "letter-spacing:0.08em'>Risks / Blockers</span>"
+            f"<div style='margin-top:6px'>{items}</div>"
+            "</div>"
+        )
+
+    actions_html = ""
+    if entry.actions:
+        items = "".join(
+            f"<div class='action-item'>"
+            f"<span class='action-num'>{i}.</span>{escape(a)}"
+            "</div>"
+            for i, a in enumerate(entry.actions, start=1)
+        )
+        actions_html = (
+            "<div style='margin-bottom:10px'>"
+            "<span style='font-size:10px;color:#6e7681;text-transform:uppercase;"
+            "letter-spacing:0.08em'>Recommended Actions</span>"
+            f"<div style='margin-top:6px'>{items}</div>"
+            "</div>"
+        )
+
+    footer = (
+        "<div style='margin-top:12px;font-size:11px;color:#6e7681'>"
+        "read_only: true &nbsp;·&nbsp; applied: false"
+        " &nbsp;·&nbsp; human validation required"
+        "</div>"
+    )
+
+    return header + risks_html + actions_html + footer
+
+
 # ---------------------------------------------------------------------------
 # Main renderer
 # ---------------------------------------------------------------------------
@@ -670,6 +740,7 @@ def render_workspace(data: WorkspaceData) -> str:
     sections = [
         ("<h2>Project Overview</h2>", _render_overview(data)),
         ("<h2>Executive Summary</h2>", _render_summary(data)),
+        ("<h2>Agent Recommendations</h2>", _render_agent_recommendations(data)),
         ("<h2>Production Readiness</h2>", _render_production_readiness(data)),
         ("<h2>Recovery Progress</h2>", _render_recovery_progress(data)),
         ("<h2>Completed Recovery Work</h2>", _render_completed_work(data)),

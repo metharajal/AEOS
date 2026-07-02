@@ -70,31 +70,40 @@ class AgentPlan:
 
 
 # ---------------------------------------------------------------------------
-# Per-project analysis
+# Per-project analysis (public entry point — no registry required)
 # ---------------------------------------------------------------------------
 
 
-def _analyse_project(
-    proj: ProjectRegistration,
-    workspace_dir: Path,
+def generate_project_entry(
+    name: str,
+    memory_dir: Path,
+    project_type: str = "recovered-project",
+    evidence_dir: Path | None = None,
+    workspace_dir: Path | None = None,
 ) -> ProjectPlanEntry:
+    """Analyse a single project without a full registry.
+
+    Pure read — never writes files, never contacts any network endpoint.
+    No LLM. No .env access. Safe to call from workspace and evidence-pack renderers.
+    """
+    ws_dir = workspace_dir if workspace_dir is not None else _DEFAULT_WS
     risks: list[str] = []
     actions: list[str] = []
     status: PlanStatus = "OK"
 
-    mem_exists = proj.memory_dir.exists()
+    mem_exists = memory_dir.exists()
     if not mem_exists:
-        risks.append(f"memory_dir not found: {proj.memory_dir}")
+        risks.append(f"memory_dir not found: {memory_dir}")
         actions.append(
             "Fix memory_dir path in registry or re-run: "
             "aeos reclaim harden --path <project-path>"
         )
         return ProjectPlanEntry(
-            name=proj.name,
-            project_type=proj.project_type,
-            memory_dir=proj.memory_dir,
+            name=name,
+            project_type=project_type,
+            memory_dir=memory_dir,
             memory_dir_exists=False,
-            evidence_dir=proj.evidence_dir,
+            evidence_dir=evidence_dir,
             evidence_dir_exists=None,
             record_count=0,
             critical=0,
@@ -104,14 +113,13 @@ def _analyse_project(
             actions=actions,
         )
 
-    # Load records to inspect findings
     record_count = 0
     critical = 0
     important = 0
     try:
         from aeos.memory.timeline import load_project_records
 
-        records = load_project_records(proj.memory_dir, proj.name)
+        records = load_project_records(memory_dir, name)
         record_count = len(records)
         if records:
             latest = records[-1]
@@ -145,30 +153,28 @@ def _analyse_project(
         if status == "OK":
             status = "WARNING"
 
-    # Evidence dir
     ev_exists: bool | None = None
-    if proj.evidence_dir is not None:
-        ev_exists = proj.evidence_dir.exists()
+    if evidence_dir is not None:
+        ev_exists = evidence_dir.exists()
         if not ev_exists:
-            risks.append(f"evidence_dir not found: {proj.evidence_dir}")
+            risks.append(f"evidence_dir not found: {evidence_dir}")
             actions.append(
-                "Regenerate: "
-                f"aeos workspace demo --output-dir {workspace_dir} --overwrite"
+                f"Regenerate: aeos workspace demo --output-dir {ws_dir} --overwrite"
             )
             if status == "OK":
                 status = "WARNING"
 
     if status == "OK":
         actions.append(
-            f"Open workspace: aeos workspace open --path {workspace_dir / 'index.html'}"
+            f"Open workspace: aeos workspace open --path {ws_dir / 'index.html'}"
         )
 
     return ProjectPlanEntry(
-        name=proj.name,
-        project_type=proj.project_type,
-        memory_dir=proj.memory_dir,
+        name=name,
+        project_type=project_type,
+        memory_dir=memory_dir,
         memory_dir_exists=True,
-        evidence_dir=proj.evidence_dir,
+        evidence_dir=evidence_dir,
         evidence_dir_exists=ev_exists,
         record_count=record_count,
         critical=critical,
@@ -176,6 +182,19 @@ def _analyse_project(
         status=status,
         risks=risks,
         actions=actions,
+    )
+
+
+def _analyse_project(
+    proj: ProjectRegistration,
+    workspace_dir: Path,
+) -> ProjectPlanEntry:
+    return generate_project_entry(
+        name=proj.name,
+        memory_dir=proj.memory_dir,
+        project_type=proj.project_type,
+        evidence_dir=proj.evidence_dir,
+        workspace_dir=workspace_dir,
     )
 
 

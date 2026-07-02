@@ -27,6 +27,7 @@ _PACK_FILES = [
     "risk-register.md",
     "human-gates.md",
     "next-actions.md",
+    "agent-plan.md",
 ]
 
 

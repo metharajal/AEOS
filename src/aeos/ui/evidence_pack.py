@@ -25,6 +25,7 @@ _PACK_FILES = [
     "risk-register.md",
     "human-gates.md",
     "next-actions.md",
+    "agent-plan.md",
 ]
 
 
@@ -262,6 +263,40 @@ def render_next_actions(ws: WorkspaceData) -> str:
     return "\n".join(lines) + "\n"
 
 
+def render_agent_plan_md(ws: WorkspaceData) -> str:
+    """Return agent-plan.md as a Markdown string.
+
+    Delegates to the deterministic planner's Markdown renderer.
+    No LLM. No network. No .env. Read-only.
+    """
+    from aeos.agent.planner import (
+        _DEFAULT_WS,
+        AGENT_MODE,
+        AgentPlan,
+        render_plan_markdown,
+    )
+
+    entry = ws.agent_plan_entry
+    if entry is None:
+        return (
+            "# AEOS Agent Plan\n\n"
+            "No agent plan available for this project.\n\n"
+            "read_only: true · applied: false · human validation required\n"
+        )
+
+    plan = AgentPlan(
+        agent_mode=AGENT_MODE,
+        registry_path=Path.home() / ".aeos" / "projects.json",
+        projects=[entry],
+        global_status=entry.status,
+        risks=entry.risks,
+        suggested_actions=entry.actions,
+        workspace_index_path=_DEFAULT_WS / "index.html",
+        workspace_index_exists=(_DEFAULT_WS / "index.html").exists(),
+    )
+    return render_plan_markdown(plan)
+
+
 # ---------------------------------------------------------------------------
 # Index HTML renderer
 # ---------------------------------------------------------------------------
@@ -371,6 +406,10 @@ _FILE_ENTRIES = [
     (
         "next-actions.md",
         "Next recommended actions — ordered with assignment fields",
+    ),
+    (
+        "agent-plan.md",
+        "Deterministic agent plan — risks, blockers, recommended actions (no LLM)",
     ),
 ]
 
@@ -487,6 +526,7 @@ def generate_evidence_pack(
     _write("risk-register.md", render_risk_register(ws_data))
     _write("human-gates.md", render_human_gates(ws_data))
     _write("next-actions.md", render_next_actions(ws_data))
+    _write("agent-plan.md", render_agent_plan_md(ws_data))
     _write("index.html", render_index(ws_data))
 
     return EvidencePackResult(
