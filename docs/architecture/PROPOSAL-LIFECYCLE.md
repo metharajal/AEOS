@@ -209,8 +209,8 @@ Proposal visible in Workspace HTML              ←── "Suggested PR" section
  └─ APPROVED: human creates PR manually (gh pr create)
          │
          │  HUMAN GATE 3 — apply
-         │  Human runs: aeos workspace apply-pr <id>
-         │  OR: aeos agent pr apply <id>  (future — see §10)
+         │  Human runs: aeos workspace apply-pr <id>  (future — see §10)
+         │  OR: aeos agent pr apply <id>             (future — see §10)
          ▼
 Apply Engine [future]
 preconditions verified (see §10)
