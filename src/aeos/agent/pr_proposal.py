@@ -469,7 +469,102 @@ def _build_rollback(
 
 
 # ---------------------------------------------------------------------------
-# Core generator
+# Core generator (no registry — memory_dir provided directly)
+# ---------------------------------------------------------------------------
+
+
+def generate_pr_proposal_from_memory(
+    project_name: str,
+    memory_dir: Path,
+) -> PRProposal:
+    """Generate a PR proposal directly from a memory directory.
+
+    Does not require a registry. Used by workspace and evidence-pack renderers
+    which already have memory_dir available. Pure read — no writes, no network.
+    No LLM. No .env.
+    """
+    from aeos.memory.timeline import load_project_records
+
+    record_count = 0
+    critical = 0
+    important = 0
+    manual = 0
+    generated = 0
+    control_level = "unknown"
+    providers: list[str] = []
+    latest_record_id: str | None = None
+
+    try:
+        records = load_project_records(memory_dir, project_name)
+        record_count = len(records)
+        if records:
+            latest = records[-1]
+            fs = latest.findings_summary
+            critical = fs.get("critical", 0)
+            important = fs.get("important", 0)
+            manual = fs.get("manual", 0)
+            generated = fs.get("generated", 0)
+            control_level = latest.control_level
+            providers = latest.providers
+            latest_record_id = latest.record_id
+    except (FileNotFoundError, ValueError):
+        pass
+
+    production_ready = critical == 0 and generated == 0
+
+    title = _build_title(
+        project_name, critical, important, generated, control_level, production_ready
+    )
+    objective = _build_objective(critical, important, generated, production_ready)
+    why_now = _build_why_now(critical, important, generated, manual, production_ready)
+    scope = _build_scope(
+        critical, important, generated, manual, providers, production_ready
+    )
+    impl_steps = _build_implementation_steps(
+        critical, important, generated, manual, providers, project_name
+    )
+    val_cmds = _build_validation_commands(project_name, memory_dir)
+    checklist = _build_approval_checklist(critical, important, generated, manual)
+    risks = _build_risks(critical, important, generated, control_level, providers)
+    rollback = _build_rollback(generated, providers)
+    likely_files = _build_likely_files(providers, None)
+
+    evidence: dict[str, object] = {
+        "record_count": record_count,
+        "latest_record_id": latest_record_id,
+        "evidence_dir": None,
+        "production_ready": production_ready,
+        "critical": critical,
+        "important": important,
+        "manual": manual,
+        "generated_sql_blocks": generated,
+        "control_level": control_level,
+        "providers": providers,
+        "registry_path": None,
+    }
+
+    return PRProposal(
+        project_name=project_name,
+        generated_at=datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        agent_mode=PR_PROPOSAL_MODE,
+        title=title,
+        objective=objective,
+        why_now=why_now,
+        recommended_scope=scope,
+        out_of_scope=list(_OUT_OF_SCOPE_ALWAYS),
+        likely_files=likely_files,
+        safety_constraints=list(_SAFETY_CONSTRAINTS),
+        implementation_steps=impl_steps,
+        validation_commands=val_cmds,
+        approval_checklist=checklist,
+        risks=risks,
+        rollback_notes=rollback,
+        evidence_references=evidence,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Core generator (registry-based)
 # ---------------------------------------------------------------------------
 
 

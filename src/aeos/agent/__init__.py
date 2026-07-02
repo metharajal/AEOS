@@ -7,6 +7,7 @@ from aeos.agent.planner import (
 from aeos.agent.pr_proposal import (
     PRProposal,
     generate_pr_proposal,
+    generate_pr_proposal_from_memory,
 )
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "ProjectPlanEntry",
     "generate_plan",
     "generate_pr_proposal",
+    "generate_pr_proposal_from_memory",
     "generate_project_entry",
 ]
