@@ -99,7 +99,7 @@ Rails are user-facing delivery paths that combine multiple capabilities and engi
 |---|---|---|
 | **CLI** | Primary interface — authoritative definition of correct behavior | Production |
 | **API** | Programmatic access — mirrors CLI semantics | Planned |
-| **Workspace** | Integrated GUI for guided recovery and operation | Planned |
+| **Workspace** | Static HTML workspace (CLI-generated, 11-section evidence HTML): Production · Interactive GUI (local web app): Planned V2 | Partial |
 | **Agents** | Autonomous task execution within human-gated boundaries | Evolving |
 
 When behavior differs between interfaces, CLI defines correct behavior.
@@ -110,22 +110,26 @@ When behavior differs between interfaces, CLI defines correct behavior.
 
 ```
 src/aeos/
-├── cli.py                          # Typer CLI — primary entry point
+├── cli.py                          # Typer CLI — primary entry point (4000+ lines)
 ├── version.py
-├── ai/
-│   ├── router.py                   # AI Routing Engine — local-first, frontier by exception
-│   ├── local.py                    # Local AI provider (Ollama)
-│   ├── frontier.py                 # Frontier AI provider (OpenAI-compatible)
-│   ├── config.py                   # AI configuration parsing
+├── agent/                          # Agent Engine — controlled, deterministic, no LLM
+│   ├── planner.py                  # AgentPlan, ProjectPlanEntry, generate_plan()
+│   ├── pr_management.py            # Proposal, ProposalRepository, ProposalStatus
+│   └── pr_proposal.py              # PRProposal, generate_pr_proposal()
+├── ai/                             # AI Routing Engine
+│   ├── router.py                   # Local-first, frontier by exception
+│   ├── local.py                    # Local AI provider (Ollama) — not yet wired to CLI commands
+│   ├── frontier.py                 # Frontier AI provider (OpenAI-compatible) — not yet wired
+│   ├── config.py                   # AI configuration parsing (reads aeos.toml [ai])
 │   └── doctor.py                   # Local runtime health check
 ├── build/
 │   ├── planner.py                  # BuildPlan, stack selection
 │   └── scaffold.py                 # Governance file scaffolding
-├── generators/
+├── generators/                     # Legacy / pending integration — not yet wired to CLI commands
 │   ├── base.py                     # Base generator contract
 │   ├── basic.py                    # Basic file generators
 │   └── python.py                   # Python project generators
-├── memory/
+├── memory/                         # Memory Engine — local-first audit record store
 │   ├── models.py                   # MemoryRecord, MemoryRecordSummary
 │   ├── store.py                    # Local read/write, no cloud sync
 │   ├── compare.py                  # Diff between two records
@@ -133,7 +137,8 @@ src/aeos/
 ├── onboarding/
 │   └── checker.py                  # Onboarding state verification
 ├── project/
-│   └── inspector.py                # General project inspection
+│   ├── inspector.py                # General project inspection
+│   └── registry.py                 # ProjectRegistration, register_project(), ~/.aeos/projects.json
 ├── providers/
 │   └── supabase/
 │       ├── checker.py              # Supabase-specific analysis
@@ -154,8 +159,18 @@ src/aeos/
 │   └── generator.py                # Report generation
 ├── security/
 │   └── checker.py                  # Secret detection (names only, never values)
-└── sovereignty/
-    └── checker.py                  # External dependency audit
+├── sovereignty/
+│   └── checker.py                  # External dependency audit
+├── ui/                             # UI Engine — static HTML generators
+│   ├── dashboard.py                # Timeline audit HTML (aeos ui dashboard)
+│   ├── workspace.py                # WorkspaceData, render_workspace() — 11-section HTML
+│   ├── evidence_pack.py            # 9-file evidence pack per project
+│   └── portfolio.py                # Multi-project portfolio HTML
+└── workspace/                      # Workspace orchestration
+    ├── demo.py                     # Full workspace demo orchestrator (aeos workspace demo)
+    ├── doctor.py                   # Workspace health check
+    ├── init.py                     # Workspace initialization
+    └── ux.py                       # Status + open (aeos workspace status/open)
 ```
 
 **Conventions (CONSTITUTION §5.1):**
@@ -248,7 +263,7 @@ Non-negotiable (CONSTITUTION §5.2):
 ```
 ruff check .          # linting and style
 mypy src              # strict type checking
-pytest                # 1400+ tests
+pytest                # 1950+ tests
 ```
 
 All three must pass before any merge. CI gate enforces this.

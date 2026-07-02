@@ -1,8 +1,8 @@
 # AEOS Agent Roadmap
 
-**Version:** 1.0
-**Sprint:** MVP-AGENTS-1
-**Status:** RATIFIED
+**Version:** 1.1
+**Updated:** MVP-DOCS-ALIGN-1 (2026-07-02)
+**Status:** UPDATED — reflects sprints as delivered through MVP-AGENTS-6A
 
 ---
 
@@ -43,93 +43,162 @@ may already have violated it.
 
 ## MVP-AGENTS-2 — Local Assistant Planner (Read-Only)
 
-**Status:** PLANNED
-**Target branch:** `agents/local-planner`
+**Status:** COMPLETE
+**Branch:** `agents/local-planner`
+**PR:** #72 · `96ac91d`
 
-**Objective:**
-A command `aeos agent plan --project <name>` that reads a project's
-MemoryRecords and produces a prioritised action plan as a Markdown file.
+**What was built:**
+- Command `aeos agent plan [--project] [--output] [--json] [--registry]`
+- `AgentPlan` dataclass, `ProjectPlanEntry` dataclass
+- `generate_plan()` — deterministic rules engine, no model
+- `generate_project_entry()` — per-project recommendation builder
+- Plan output carries `read_only: true · applied: false`
+- Full test coverage
 
-**Scope:**
-- Read MemoryRecords from registered project
-- Apply deterministic rules to identify top 5 recommended actions
-- Produce `agent-plan.md` in the project's evidence directory
-- Display plan in terminal
-- No model required for this sprint — pure deterministic logic
+**What was NOT built:**
+- No model integration — pure deterministic logic as planned
 
-**Constraints:**
-- Read-only. No model calls. No network.
-- Output must carry `read_only: true · applied: false`
-- Gates 1–4 from `AGENT-SAFETY-GATES.md` must pass
-
-**Success criteria:**
-- `uv run aeos agent plan --project ma-mairie-digitale` produces a valid plan
-- Plan references specific MemoryRecord findings
-- Plan does not contain any secret or file content
+**Constraints met:**
+- Read-only, no model calls, no network
+- Gates 1–4 from `AGENT-SAFETY-GATES.md` pass
 
 ---
 
 ## MVP-AGENTS-3 — Agent Recommendations in Workspace
 
-**Status:** PLANNED
-**Target branch:** `agents/workspace-recommendations`
+**Status:** COMPLETE
+**Branch:** `agents/workspace-recommendations`
+**PR:** #73 · `fd16037`
 
-**Objective:**
-Embed the agent plan output into the generated workspace HTML, so a CTO
-browsing the workspace sees AI-assisted recommendations alongside audit
-findings.
+**What was built:**
+- "Recommendations" section embedded in `aeos ui project-workspace` HTML (11-section workspace)
+- Agent plan output consumed in `aeos workspace demo` orchestration
+- Evidence pack includes plan output when present
+- Workspace renders cleanly when plan is absent (graceful skip)
 
-**Scope:**
-- Extend `workspace demo` to include `agent-plan.md` in the evidence pack
-- Add a "Recommendations" section to `project-workspace.html`
-- Source content from plan file if present, skip gracefully if absent
-- No new model calls — consumes the plan produced by MVP-AGENTS-2
-
-**Constraints:**
-- Read-only HTML generation only
-- Plan must be present and human-reviewed before inclusion
-- No inline JavaScript model calls in the HTML
-
-**Success criteria:**
-- Workspace HTML shows recommendations when plan file exists
-- Workspace HTML renders cleanly when plan file is absent
-- Evidence pack includes the plan file
+**Constraints met:**
+- Read-only HTML generation
+- No inline model calls in HTML
+- Plan must be present; section skipped if absent
 
 ---
 
 ## MVP-AGENTS-4 — PR Proposal Generator
 
-**Status:** PLANNED
-**Target branch:** `agents/pr-proposal`
+**Status:** COMPLETE
+**Branch:** `agents/pr-proposal`
+**PR:** #74 · `2d8bb7c`
 
-**Objective:**
-A command `aeos agent propose-pr --project <name>` that generates a
-structured PR description based on the agent plan, ready for human review
-before the human runs `gh pr create` manually.
+**What was built:**
+- Command `aeos agent pr-proposal [--project] [--output] [--json] [--registry]`
+- `PRProposal` dataclass (14-section structured proposal)
+- `generate_pr_proposal()` — deterministic, no LLM, no network
+- `generate_pr_proposal_from_memory()` — reads MemoryRecords directly
+- PR proposal carries `read_only: true · applied: false`
+- Human copies proposal text, then runs `gh pr create` themselves
 
-**Scope:**
-- Read agent plan from evidence directory
-- Generate PR title, body, and checklist as a Markdown file
-- Display in terminal
-- Human copies or approves, then runs `gh pr create` themselves
+**What was NOT built:**
+- Agent does not call `gh pr create` — human action required
+- No model calls
 
-**Constraints:**
-- Agent never calls `gh pr create`
-- PR proposal must reference evidence files for every claim
-- Must carry `read_only: true · applied: false`
-- Gates 1–5 from `AGENT-SAFETY-GATES.md` must pass (Gate 5 = human review)
-
-**Success criteria:**
-- Proposal is coherent and references specific findings
-- Human can create the PR in one copy-paste step
+**Constraints met:**
 - Agent never opens the PR autonomously
+- Gates 1–5 from `AGENT-SAFETY-GATES.md` pass (Gate 5 = human review)
 
 ---
 
-## MVP-AGENTS-5 — Controlled Local Model Integration
+## MVP-AGENTS-4A — Agent Workflow Evidence
+
+**Status:** COMPLETE
+**PR:** #75 · `167f0f3`
+
+**What was built:**
+- `docs/evidence/AEOS-AGENT-WORKFLOW-EVIDENCE.md`
+- Complete evidence document covering MVP-AGENTS-2, 3, and 4
+- Smoke test output, quality gate results, safety invariants verified
+
+---
+
+## MVP-AGENTS-5 — PR Proposal in Workspace
+
+**Status:** COMPLETE
+**Branch:** `agents/agentic-workspace`
+**PR:** #76 · `dec1ac0`
+
+> **Scope note:** The original MVP-AGENTS-5 planned Controlled Local Model
+> Integration (Ollama). That work was deferred and is now tracked as
+> MVP-AGENTS-7. This sprint delivered PR Proposal integration into the
+> static workspace and evidence pack.
+
+**What was built:**
+- PR Proposal section embedded in `aeos ui project-workspace` HTML
+- `aeos workspace demo` now produces PR proposal file as part of the evidence pack
+- Workspace HTML shows a "Suggested PR" block drawn from the generated proposal
+- Evidence pack (9 files per project) includes `pr-proposal.md`
+
+**Constraints met:**
+- Read-only HTML generation only
+- No model calls — proposal sourced from `generate_pr_proposal_from_memory()`
+
+---
+
+## MVP-AGENTS-5A — Agentic Workspace Evidence
+
+**Status:** COMPLETE
+**PR:** #77 · `e912cc7`
+
+**What was built:**
+- `docs/evidence/AEOS-AGENTIC-WORKSPACE-EVIDENCE.md`
+- Evidence document covering the agentic workspace integration
+- Smoke test output, quality gate results, invariants verified
+
+---
+
+## MVP-AGENTS-6 — Controlled PR Management
+
+**Status:** COMPLETE
+**Branch:** `agents/controlled-pr-management`
+**PR:** #78 · `0047bec`
+
+> **Scope note:** The original MVP-AGENTS-6 planned a Frontier Escalation
+> Workflow. That work was deferred and is now tracked as MVP-AGENTS-8.
+> This sprint delivered a read-only local PR proposal management layer.
+
+**What was built:**
+- Commands `aeos agent pr list [--proposals-dir]` and `aeos agent pr show <id> [--proposals-dir]`
+- `ProposalStatus(StrEnum)` — `pending`, `applied`, `dismissed`
+- `Proposal` dataclass — local PR proposal from `workspace/proposals/<id>/proposal.json`
+- `ProposalRepository` — read-only store: `list()` + `get(id)`
+- `render_proposal_list()` / `render_proposal_detail()` — terminal renderers
+- `DEFAULT_PROPOSALS_DIR` = `~/.aeos/workspace/proposals/`
+- 58 new tests covering all behaviors, edge cases, and safety invariants
+- Every output carries `read_only: true · applied: false · human validation required`
+
+**Constraints met:**
+- No GitHub API call. No git command. No network. No file mutation.
+- Repository never writes — `list()` and `get()` are read-only
+
+---
+
+## MVP-AGENTS-6A — Controlled PR Management Evidence
+
+**Status:** COMPLETE
+**PR:** #79 · `e17e24f`
+
+**What was built:**
+- `docs/evidence/AEOS-CONTROLLED-PR-MANAGEMENT-EVIDENCE.md`
+- Complete evidence document covering MVP-AGENTS-6
+- Lifecycle diagram, safety architecture table, smoke test output, 1950-test quality gate
+
+---
+
+## MVP-AGENTS-7 — Controlled Local Model Integration
 
 **Status:** PLANNED
 **Target branch:** `agents/local-model`
+
+> This sprint was originally numbered MVP-AGENTS-5. Its scope is unchanged.
+> It was deferred to allow PR proposal and workspace integration to ship first.
 
 **Objective:**
 Connect AEOS to a locally-served open model (Ollama) to power plan generation
@@ -155,10 +224,13 @@ with natural language reasoning instead of deterministic rules.
 
 ---
 
-## MVP-AGENTS-6 — Frontier Escalation Workflow
+## MVP-AGENTS-8 — Frontier Escalation Workflow
 
 **Status:** PLANNED
 **Target branch:** `agents/frontier-escalation`
+
+> This sprint was originally numbered MVP-AGENTS-6. Its scope is unchanged.
+> It was deferred to allow PR proposal and PR management to ship first.
 
 **Objective:**
 Implement the escalation protocol from `FRONTIER-AI-ESCALATION.md` as an
@@ -222,11 +294,16 @@ No agent sprint closes without all five gates satisfied.
 
 ## Summary Timeline
 
-| Sprint | Command | Capability | Model required |
-|--------|---------|-----------|----------------|
-| MVP-AGENTS-1 | — | Policy only | No |
-| MVP-AGENTS-2 | `aeos agent plan` | Deterministic plan | No |
-| MVP-AGENTS-3 | `aeos workspace demo` | Plan in workspace | No |
-| MVP-AGENTS-4 | `aeos agent propose-pr` | PR proposal | No |
-| MVP-AGENTS-5 | `aeos agent plan --model` | Local model plan | Ollama (local) |
-| MVP-AGENTS-6 | `aeos agent plan --escalate` | Frontier escalation | Claude / GPT-4 |
+| Sprint | Command | Capability | Model required | Status |
+|--------|---------|-----------|----------------|--------|
+| MVP-AGENTS-1 | — | Policy only | No | COMPLETE |
+| MVP-AGENTS-2 | `aeos agent plan` | Deterministic plan | No | COMPLETE |
+| MVP-AGENTS-3 | `aeos workspace demo` | Plan in workspace | No | COMPLETE |
+| MVP-AGENTS-4 | `aeos agent pr-proposal` | PR proposal (deterministic) | No | COMPLETE |
+| MVP-AGENTS-4A | — | Evidence doc | No | COMPLETE |
+| MVP-AGENTS-5 | `aeos workspace demo` | PR proposal in workspace | No | COMPLETE |
+| MVP-AGENTS-5A | — | Evidence doc | No | COMPLETE |
+| MVP-AGENTS-6 | `aeos agent pr list/show` | Controlled PR management | No | COMPLETE |
+| MVP-AGENTS-6A | — | Evidence doc | No | COMPLETE |
+| MVP-AGENTS-7 | `aeos agent plan --model` | Local model plan | Ollama (local) | PLANNED |
+| MVP-AGENTS-8 | `aeos agent plan --escalate` | Frontier escalation | Claude / GPT-4 | PLANNED |
