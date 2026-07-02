@@ -52,7 +52,7 @@ without explaining to what, or why. These systems represent enormous sunk invest
 They encode business logic that has never been documented. They fail slowly and
 expensively.
 
-**The cost sovereignty trap.** Developing with frontier AI platforms at scale is not
+**The cost sovereignty trap.** Developing with external AI platforms at scale is not
 economically viable for independent builders, small teams, or organizations in
 cost-constrained markets. The marginal cost per iteration compounds. The routing
 decisions are made by the platform, not the engineer. The data leaves the machine
@@ -149,16 +149,16 @@ explicit logging.
 
 ### INV.04 — AI Local-first
 
-**Definition:** AI assistance defaults to locally-running models. Frontier AI — any
-model not running on the operator's infrastructure — is used only when local AI is
+**Definition:** AI assistance defaults to locally-running models. Externally-hosted AI —
+any model not running on the operator's infrastructure — is used only when local AI is
 demonstrably insufficient, with explicit human authorization for each call.
 
-**Why it exists:** Using a frontier provider by default makes the platform the
+**Why it exists:** Using an external AI provider by default makes the platform the
 authority over what happens to the operator's data. AI is a partner, not an
 authority. (CONSTITUTION §3.4)
 
 **Architectural consequence:** The AI routing layer must be configurable per
-operation. Local AI is the first path. Frontier AI is the exception path with a
+operation. Local AI is the first path. Externally-hosted AI is the exception path with a
 mandatory human gate. The routing decision must be logged permanently.
 
 ---
@@ -244,7 +244,7 @@ no position in the downward dependency order; it has authority over all position
 ```
   ┌─────────────────────┐   ┌──────────────────────────────────────┐
   │                     │   │  LAYER 1 — Interface                 │
-  │                     │   │  CLI · API · Workspace · Agents       │
+  │                     │   │  Multiple interaction surfaces          │
   │                     │   └─────────────────┬────────────────────┘
   │    GOVERNANCE       │                     │
   │                     │   ┌─────────────────▼────────────────────┐
@@ -283,7 +283,7 @@ with the same invariants.
 **Responsibilities:**
 - Accept human input and route it to capabilities
 - Present capability outputs in the format appropriate to the interface
-- Maintain CLI as the authoritative reference when interfaces diverge
+- One interaction surface is designated as the authoritative reference when surfaces diverge. That designation belongs in ARCHITECTURE.md, not here.
 - Enforce that no interface bypasses governance invariants
 
 **Limits:**
@@ -685,7 +685,7 @@ Sanitization gate
         │
         ├── YES → Call local AI · log (hash only) · return response
         │
-        └── NO → Is frontier AI authorized?
+        └── NO → Is externally-hosted AI authorized?
                 │
                 ├── NO → Deterministic fallback · log
                 │
@@ -693,7 +693,7 @@ Sanitization gate
                               │  Show sanitized context summary
                               │  Human confirms
                               ▼
-                         Call frontier AI
+                         Call externally-hosted AI
                          Log (hash + timestamp + provider type)
                          Return response
                 │
@@ -701,8 +701,8 @@ Sanitization gate
 ```
 
 The sanitization gate is non-bypassable. The local-first routing is non-negotiable.
-The human gate before frontier AI is non-negotiable. These three properties will
-remain true regardless of which specific AI systems exist at any given time.
+The human gate before externally-hosted AI is non-negotiable. These three properties
+will remain true regardless of which specific AI systems exist at any given time.
 
 ---
 
@@ -874,28 +874,3 @@ implementation, adopt new providers, and integrate new capabilities — without
 changing what it fundamentally is. The model governs evolution. Evolution does not
 govern the model.
 
----
-
-## Annexe — Index de redistribution
-
-This section documents what was moved out of this document in v2.0 and where it now lives.
-This index exists so that no information is lost — only repositioned.
-
-| Content | Previous location | New location |
-|---|---|---|
-| 9 provider family definitions | §6 (v1.0) | ARCHITECTURE.md |
-| 11 agent family definitions | §7 (v1.0) | AGENT-ROADMAP.md |
-| Rails status table (Production/Planned) | §8 (v1.0) | ARCHITECTURE.md |
-| Flux 1 — Recovery Arc (specific stages) | §9 (v1.0) | ARCHITECTURE.md |
-| Flux 5 — Operate mode (specific patterns) | §9 (v1.0) | ARCHITECTURE.md |
-| 10 stability criteria (S.01–S.10) | §13 (v1.0) | Dissolved — this document is the stability contract |
-| Cross-document validation table | Validation (v1.0) | Removed — consistency is verified by the RFC process, not by the document itself |
-| INV.08 Reproducibility | §2 (v1.0) | Absorbed into evolution contract (Q4, Q6) |
-| INV.10 Open Standards | §2 (v1.0) | Absorbed into INV.08 Provider Replaceability |
-| INV.11 Modularity | §2 (v1.0) | Absorbed into INV.08 and Engine layer limits |
-| INV.12 Portability | §2 (v1.0) | Absorbed into INV.01 Sovereignty |
-| INV.13 No Vendor Lock-in | §2 (v1.0) | Merged into INV.08 Provider Replaceability |
-| INV.14 Read-only / Applied:false | §2 (v1.0) | Merged into INV.05 Human Gate (two forms of one principle) |
-| INV.15 Mandatory Evidence | §2 (v1.0) | Merged into INV.07 Evidence & Auditability |
-| Task object definition | §4 (v1.0) | Removed — operational concept, not fundamental object |
-| Workflow object definition | §4 (v1.0) | Removed — operational concept, not fundamental object |
