@@ -42,6 +42,9 @@ ui_app = typer.Typer(help="UI commands — generate static dashboards.")
 workspace_app = typer.Typer(
     help="Workspace commands — generate full project workspaces."
 )
+agent_app = typer.Typer(
+    help="Agent commands — deterministic planning and recommendations."
+)
 app.add_typer(project_app, name="project")
 app.add_typer(ai_app, name="ai")
 app.add_typer(sovereignty_app, name="sovereignty")
@@ -56,6 +59,7 @@ app.add_typer(memory_app, name="memory")
 app.add_typer(build_app, name="build")
 app.add_typer(ui_app, name="ui")
 app.add_typer(workspace_app, name="workspace")
+app.add_typer(agent_app, name="agent")
 
 REQUIRED_TOOLS = ["python", "uv", "git", "docker", "node", "pnpm", "gh", "code"]
 
@@ -3788,4 +3792,98 @@ def workspace_doctor_cmd(
     typer.echo("  read_only: true  ·  applied: false")
 
     if result.overall_status == "ERROR":
+        raise typer.Exit(code=1)
+
+
+# ---------------------------------------------------------------------------
+# agent plan
+# ---------------------------------------------------------------------------
+
+
+@agent_app.command("plan")
+def agent_plan_cmd(
+    registry: str = typer.Option(
+        "",
+        "--registry",
+        help="Registry path (default: ~/.aeos/projects.json).",
+    ),
+    project: str = typer.Option(
+        "",
+        "--project",
+        help="Target a single registered project by name.",
+    ),
+    output: str = typer.Option(
+        "",
+        "--output",
+        help="Write plan as Markdown to this file path.",
+    ),
+    as_json: bool = typer.Option(
+        False,
+        "--json",
+        help="Print plan as JSON instead of Markdown summary.",
+    ),
+) -> None:
+    """Generate a deterministic read-only plan from the local registry."""
+    from aeos.agent.planner import generate_plan, render_plan_json, render_plan_markdown
+    from aeos.workspace.ux import DEFAULT_WORKSPACE_DIR
+
+    reg_path = Path(registry) if registry else None
+    proj_filter = project if project else None
+
+    plan = generate_plan(
+        registry_path=reg_path,
+        project_filter=proj_filter,
+        workspace_dir=DEFAULT_WORKSPACE_DIR,
+    )
+
+    if as_json:
+        typer.echo(render_plan_json(plan))
+        if plan.global_status == "ERROR":
+            raise typer.Exit(code=1)
+        return
+
+    # Terminal summary
+    typer.echo("AEOS Agent Plan")
+    typer.echo("")
+    typer.echo(f"Mode:              {plan.agent_mode}")
+    typer.echo(f"Registry:          {plan.registry_path}")
+    typer.echo(f"Projects:          {len(plan.projects)}")
+    typer.echo(f"Global status:     {plan.global_status}")
+    typer.echo("")
+
+    for entry in plan.projects:
+        tag = f"[{entry.status}]"
+        rec = f"{entry.record_count} record(s)"
+        crit = f"critical={entry.critical}"
+        imp = f"important={entry.important}"
+        typer.echo(f"  {tag:<9}  {entry.name}  —  {rec}  {crit}  {imp}")
+        for risk in entry.risks:
+            typer.echo(f"             ! {risk}")
+        for act in entry.actions:
+            typer.echo(f"             → {act}")
+
+    if plan.risks:
+        typer.echo("")
+        typer.echo("Global risks:")
+        for r in plan.risks:
+            typer.echo(f"  ! {r}")
+
+    if plan.suggested_actions:
+        typer.echo("")
+        typer.echo("Suggested next:")
+        for i, act in enumerate(plan.suggested_actions, 1):
+            typer.echo(f"  {i}. {act}")
+
+    typer.echo("")
+    typer.echo("  read_only: true  ·  applied: false  ·  human validation required")
+
+    if output:
+        out_path = Path(output)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        md = render_plan_markdown(plan)
+        out_path.write_text(md, encoding="utf-8")
+        typer.echo("")
+        typer.echo(f"Plan written to:   {out_path}")
+
+    if plan.global_status == "ERROR":
         raise typer.Exit(code=1)
