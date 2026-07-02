@@ -31,7 +31,7 @@ def test_read_ai_config_defaults_when_no_ai_section(tmp_path: Path) -> None:
     assert result.mode == "local-first"
     assert result.frontier_allowed is True
     assert result.require_human_approval is True
-    assert result.local.provider == "ollama"
+    assert result.local.provider == "openai-compatible"
     assert result.local.base_url == "http://localhost:11434"
     assert result.local.default_model == "llama3.2"
     assert result.frontier.provider == "openai-compatible"
@@ -204,35 +204,154 @@ def _fake_urlopen(
 def test_ask_local_ai_returns_response(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "aeos.ai.local.urllib.request.urlopen",
-        _fake_urlopen({"response": "AEOS est un système.", "done": True}),
+        _fake_urlopen({"choices": [{"message": {"content": "AEOS est un système."}}]}),
     )
     result = ask_local_ai("Explique AEOS", _make_ollama_config())
     assert result.text == "AEOS est un système."
 
 
-def test_ask_local_ai_ollama_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_ask_local_ai_runtime_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
     def _raise(_req: object, **_kwargs: object) -> None:
         raise urllib.error.URLError("Connection refused")
 
     monkeypatch.setattr("aeos.ai.local.urllib.request.urlopen", _raise)
-    with pytest.raises(LocalAiError, match="Ollama unreachable"):
+    with pytest.raises(LocalAiError, match="local AI runtime unreachable"):
         ask_local_ai("test", _make_ollama_config())
 
 
 def test_ask_local_ai_empty_response(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "aeos.ai.local.urllib.request.urlopen",
-        _fake_urlopen({"response": "", "done": True}),
+        _fake_urlopen({"choices": []}),
     )
     with pytest.raises(LocalAiError, match="empty or invalid"):
         ask_local_ai("test", _make_ollama_config())
 
 
-def test_ask_local_ai_unsupported_provider() -> None:
+def test_ask_local_ai_accepts_any_provider_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "aeos.ai.local.urllib.request.urlopen",
+        _fake_urlopen({"choices": [{"message": {"content": "ok"}}]}),
+    )
     config = _make_ollama_config()
     config.local.provider = "lm-studio"
-    with pytest.raises(LocalAiError, match="unsupported local provider"):
+    result = ask_local_ai("test", config)
+    assert result.text == "ok"
+
+
+def test_ask_local_ai_rejects_public_endpoint() -> None:
+    config = _make_ollama_config()
+    config.local.base_url = "http://api.example.com"
+    with pytest.raises(LocalAiError, match="local AI runtime must use a local"):
         ask_local_ai("test", config)
+
+
+def _capturing_urlopen(
+    response_dict: dict[str, object], captured: dict[str, object]
+) -> Callable[..., MagicMock]:
+    def _open(req: object, **_kwargs: object) -> MagicMock:
+        import urllib.request as _ur
+
+        if isinstance(req, _ur.Request):
+            captured["url"] = req.full_url
+            captured["payload"] = json.loads(req.data)
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps(response_dict).encode("utf-8")
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        return mock_resp
+
+    return _open
+
+
+_OAI_RESPONSE = {"choices": [{"message": {"content": "ok"}}]}
+
+
+def test_ask_local_ai_uses_v1_chat_completions_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        "aeos.ai.local.urllib.request.urlopen",
+        _capturing_urlopen(_OAI_RESPONSE, captured),
+    )
+    ask_local_ai("test", _make_ollama_config())
+    assert str(captured.get("url", "")).endswith("/v1/chat/completions")
+
+
+def test_ask_local_ai_request_uses_messages_format(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        "aeos.ai.local.urllib.request.urlopen",
+        _capturing_urlopen(_OAI_RESPONSE, captured),
+    )
+    ask_local_ai("hello", _make_ollama_config())
+    payload = captured.get("payload", {})
+    assert isinstance(payload, dict)
+    assert "messages" in payload
+    assert payload["messages"] == [{"role": "user", "content": "hello"}]
+    assert "prompt" not in payload
+
+
+def test_ask_local_ai_uses_model_from_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        "aeos.ai.local.urllib.request.urlopen",
+        _capturing_urlopen(_OAI_RESPONSE, captured),
+    )
+    config = _make_ollama_config()
+    config.local.default_model = "mistral-7b"
+    ask_local_ai("test", config)
+    payload = captured.get("payload", {})
+    assert isinstance(payload, dict)
+    assert payload.get("model") == "mistral-7b"
+
+
+def test_ask_local_ai_accepts_ipv4_loopback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "aeos.ai.local.urllib.request.urlopen",
+        _fake_urlopen(_OAI_RESPONSE),
+    )
+    config = _make_ollama_config()
+    config.local.base_url = "http://127.0.0.1:11434"
+    result = ask_local_ai("test", config)
+    assert result.text == "ok"
+
+
+def test_ask_local_ai_accepts_ipv6_loopback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "aeos.ai.local.urllib.request.urlopen",
+        _fake_urlopen(_OAI_RESPONSE),
+    )
+    config = _make_ollama_config()
+    config.local.base_url = "http://[::1]:11434"
+    result = ask_local_ai("test", config)
+    assert result.text == "ok"
+
+
+def test_doctor_health_check_uses_v1_models(
+    tmp_path: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_minimal_ai_toml(tmp_path)
+    captured: dict[str, object] = {}
+
+    def _capture(url: str, timeout: int) -> tuple[bool, str]:
+        captured["url"] = url
+        return (True, "")
+
+    monkeypatch.setattr("aeos.ai.doctor._check_endpoint", _capture)
+    run_ai_doctor(tmp_path)
+    assert str(captured.get("url", "")).endswith("/v1/models")
 
 
 def _make_frontier_config() -> AiConfig:

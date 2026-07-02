@@ -88,11 +88,8 @@ def run_ai_doctor(path: Path) -> AiDoctorResult:
     if config is None:
         return _make_error_result()
 
-    if config.local.provider == "ollama":
-        endpoint_url = config.local.base_url.rstrip("/") + "/api/tags"
-        endpoint_ok, endpoint_error = _check_endpoint(endpoint_url, timeout=1)
-    else:
-        endpoint_ok, endpoint_error = False, "provider not checked"
+    endpoint_url = config.local.base_url.rstrip("/") + "/v1/models"
+    endpoint_ok, endpoint_error = _check_endpoint(endpoint_url, timeout=1)
 
     local = LocalCheckResult(
         provider=config.local.provider,

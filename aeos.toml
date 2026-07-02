@@ -25,7 +25,7 @@ frontier_allowed = true
 require_human_approval = true
 
 [ai.local]
-provider = "ollama"
+provider = "openai-compatible"
 base_url = "http://localhost:11434"
 default_model = "llama3.2"
 
