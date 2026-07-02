@@ -3887,3 +3887,60 @@ def agent_plan_cmd(
 
     if plan.global_status == "ERROR":
         raise typer.Exit(code=1)
+
+
+@agent_app.command("pr-proposal")
+def agent_pr_proposal_cmd(
+    project: str = typer.Option(
+        ...,
+        "--project",
+        help="Registered project name to generate a PR proposal for.",
+    ),
+    registry: str = typer.Option(
+        "",
+        "--registry",
+        help="Registry path (default: ~/.aeos/projects.json).",
+    ),
+    output: str = typer.Option(
+        "",
+        "--output",
+        help="Write PR proposal as Markdown to this file path.",
+    ),
+    as_json: bool = typer.Option(
+        False,
+        "--json",
+        help="Print PR proposal as JSON instead of Markdown summary.",
+    ),
+) -> None:
+    """Generate a deterministic read-only PR proposal from the local registry."""
+    from aeos.agent.pr_proposal import (
+        generate_pr_proposal,
+        render_pr_proposal_json,
+        render_pr_proposal_markdown,
+        render_pr_proposal_summary,
+    )
+
+    reg_path = Path(registry) if registry else None
+
+    try:
+        proposal = generate_pr_proposal(
+            project_name=project,
+            registry_path=reg_path,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if as_json:
+        typer.echo(render_pr_proposal_json(proposal))
+        return
+
+    typer.echo(render_pr_proposal_summary(proposal))
+
+    if output:
+        out_path = Path(output)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        md = render_pr_proposal_markdown(proposal)
+        out_path.write_text(md, encoding="utf-8")
+        typer.echo("")
+        typer.echo(f"Proposal written to: {out_path}")
