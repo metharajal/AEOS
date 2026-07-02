@@ -26,6 +26,7 @@ _PACK_FILES = [
     "human-gates.md",
     "next-actions.md",
     "agent-plan.md",
+    "pr-proposal.md",
 ]
 
 
@@ -297,6 +298,24 @@ def render_agent_plan_md(ws: WorkspaceData) -> str:
     return render_plan_markdown(plan)
 
 
+def render_pr_proposal_md(ws: WorkspaceData) -> str:
+    """Return pr-proposal.md as a Markdown string.
+
+    Delegates to the PR proposal Markdown renderer.
+    No LLM. No network. No .env. Read-only.
+    """
+    from aeos.agent.pr_proposal import render_pr_proposal_markdown
+
+    proposal = ws.pr_proposal
+    if proposal is None:
+        return (
+            "# AEOS PR Proposal\n\n"
+            "No PR proposal available for this project.\n\n"
+            "read_only: true · applied: false · human validation required\n"
+        )
+    return render_pr_proposal_markdown(proposal)
+
+
 # ---------------------------------------------------------------------------
 # Index HTML renderer
 # ---------------------------------------------------------------------------
@@ -410,6 +429,10 @@ _FILE_ENTRIES = [
     (
         "agent-plan.md",
         "Deterministic agent plan — risks, blockers, recommended actions (no LLM)",
+    ),
+    (
+        "pr-proposal.md",
+        "Deterministic PR proposal — 14-section proposal, no LLM, no network",
     ),
 ]
 
@@ -527,6 +550,7 @@ def generate_evidence_pack(
     _write("human-gates.md", render_human_gates(ws_data))
     _write("next-actions.md", render_next_actions(ws_data))
     _write("agent-plan.md", render_agent_plan_md(ws_data))
+    _write("pr-proposal.md", render_pr_proposal_md(ws_data))
     _write("index.html", render_index(ws_data))
 
     return EvidencePackResult(

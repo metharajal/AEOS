@@ -20,6 +20,7 @@ from aeos.memory.timeline import (
 
 if TYPE_CHECKING:
     from aeos.agent.planner import ProjectPlanEntry
+    from aeos.agent.pr_proposal import PRProposal
 
 _CSS = """
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -195,6 +196,7 @@ class WorkspaceData:
     human_gates: list[str]
     next_actions: list[str]
     agent_plan_entry: ProjectPlanEntry | None = field(default=None)
+    pr_proposal: PRProposal | None = field(default=None)
 
 
 # ---------------------------------------------------------------------------
@@ -405,9 +407,14 @@ def load_workspace_data(memory_dir: Path, project_name: str) -> WorkspaceData:
     actions = _derive_next_actions(last, pr)
 
     from aeos.agent.planner import generate_project_entry
+    from aeos.agent.pr_proposal import generate_pr_proposal_from_memory
 
     agent_entry = generate_project_entry(
         name=project_name,
+        memory_dir=memory_dir,
+    )
+    proposal = generate_pr_proposal_from_memory(
+        project_name=project_name,
         memory_dir=memory_dir,
     )
 
@@ -421,6 +428,7 @@ def load_workspace_data(memory_dir: Path, project_name: str) -> WorkspaceData:
         human_gates=gates,
         next_actions=actions,
         agent_plan_entry=agent_entry,
+        pr_proposal=proposal,
     )
 
 
@@ -727,6 +735,82 @@ def _render_agent_recommendations(data: WorkspaceData) -> str:
     return header + risks_html + actions_html + footer
 
 
+def _render_suggested_pr(data: WorkspaceData) -> str:
+    proposal = data.pr_proposal
+    if proposal is None:
+        return "<p style='color:#6e7681'>PR proposal not available.</p>"
+
+    title_html = (
+        "<div style='margin-bottom:12px'>"
+        "<span style='font-size:10px;color:#6e7681;text-transform:uppercase;"
+        "letter-spacing:0.08em'>Proposed title</span><br>"
+        f"<span style='color:#58a6ff;font-weight:bold'>{escape(proposal.title)}</span>"
+        "</div>"
+    )
+
+    obj_html = (
+        "<div style='margin-bottom:10px'>"
+        "<span style='font-size:10px;color:#6e7681;text-transform:uppercase;"
+        "letter-spacing:0.08em'>Objective</span>"
+        f"<p style='margin-top:4px'>{escape(proposal.objective)}</p>"
+        "</div>"
+    )
+
+    why_items = "".join(
+        f"<div class='gate-item' style='color:#d29922'>{escape(r)}</div>"
+        for r in proposal.why_now
+    )
+    why_html = (
+        "<div style='margin-bottom:10px'>"
+        "<span style='font-size:10px;color:#6e7681;text-transform:uppercase;"
+        "letter-spacing:0.08em'>Why this PR now</span>"
+        f"<div style='margin-top:6px'>{why_items}</div>"
+        "</div>"
+    )
+
+    scope_items = "".join(
+        f"<div class='action-item'>"
+        f"<span class='action-num'>{i}.</span>{escape(s)}"
+        "</div>"
+        for i, s in enumerate(proposal.recommended_scope[:4], 1)
+    )
+    if len(proposal.recommended_scope) > 4:
+        remaining = len(proposal.recommended_scope) - 4
+        scope_items += (
+            f"<div style='color:#6e7681;font-size:11px;padding:4px 0'>"
+            f"… and {remaining} more — see evidence-pack pr-proposal.md</div>"
+        )
+    scope_html = (
+        "<div style='margin-bottom:10px'>"
+        "<span style='font-size:10px;color:#6e7681;text-transform:uppercase;"
+        "letter-spacing:0.08em'>Recommended scope</span>"
+        f"<div style='margin-top:6px'>{scope_items}</div>"
+        "</div>"
+    )
+
+    cmd_items = "".join(
+        f"<div style='padding:2px 0;color:#3fb950'>→ {escape(c)}</div>"
+        for c in proposal.validation_commands[:3]
+    )
+    cmd_html = (
+        "<div style='margin-bottom:10px'>"
+        "<span style='font-size:10px;color:#6e7681;text-transform:uppercase;"
+        "letter-spacing:0.08em'>Validation commands</span>"
+        f"<div style='margin-top:6px;font-size:12px'>{cmd_items}</div>"
+        "</div>"
+    )
+
+    footer = (
+        "<div style='margin-top:12px;font-size:11px;color:#6e7681'>"
+        "read_only: true &nbsp;·&nbsp; applied: false"
+        " &nbsp;·&nbsp; human validation required<br>"
+        f"<em>{escape(proposal.final_statement)}</em>"
+        "</div>"
+    )
+
+    return title_html + obj_html + why_html + scope_html + cmd_html + footer
+
+
 # ---------------------------------------------------------------------------
 # Main renderer
 # ---------------------------------------------------------------------------
@@ -741,6 +825,7 @@ def render_workspace(data: WorkspaceData) -> str:
         ("<h2>Project Overview</h2>", _render_overview(data)),
         ("<h2>Executive Summary</h2>", _render_summary(data)),
         ("<h2>Agent Recommendations</h2>", _render_agent_recommendations(data)),
+        ("<h2>Suggested PR</h2>", _render_suggested_pr(data)),
         ("<h2>Production Readiness</h2>", _render_production_readiness(data)),
         ("<h2>Recovery Progress</h2>", _render_recovery_progress(data)),
         ("<h2>Completed Recovery Work</h2>", _render_completed_work(data)),

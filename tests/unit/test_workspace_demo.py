@@ -28,6 +28,7 @@ _PACK_FILES = [
     "human-gates.md",
     "next-actions.md",
     "agent-plan.md",
+    "pr-proposal.md",
 ]
 
 
