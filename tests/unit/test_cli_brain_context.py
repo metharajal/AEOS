@@ -146,6 +146,26 @@ class TestBrainContextJson:
         parsed = json.loads(result.output)
         assert parsed["question"] == "security risks"
 
+    def test_json_output_excludes_project_path(self, tmp_path: Path) -> None:
+        brain_dir = tmp_path / "brain"
+        with BrainStore.open(brain_dir, "test-proj") as brain:
+            from aeos.brain.models import ProjectIdentity
+
+            brain.upsert_identity(
+                ProjectIdentity(
+                    project_name="test-proj",
+                    project_path="/secret/internal/path/test-proj",
+                )
+            )
+        result = _context(tmp_path, as_json=True)
+        assert result.exit_code == 0
+        output = result.output
+        assert "/secret/internal/path/test-proj" not in output
+        parsed = json.loads(output)
+        identity = parsed.get("project_identity")
+        assert identity is not None
+        assert "project_path" not in identity
+
 
 # ---------------------------------------------------------------------------
 # Budget flag and fact presence

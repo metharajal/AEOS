@@ -15,6 +15,10 @@ from aeos.brain.models import Decision, KnowledgeFact, ProjectIdentity, Vocabula
 from aeos.brain.store import BrainStore
 from aeos.memory.store import _looks_like_secret_value
 
+# _looks_like_secret_value is a narrow heuristic (JWT, long base64, Stripe keys).
+# Defence-in-depth only — the primary protection is that MemoryRecords are
+# produced by controlled AEOS commands, not from arbitrary user-supplied text.
+
 # ---------------------------------------------------------------------------
 # Dimension keyword mapping
 # ---------------------------------------------------------------------------

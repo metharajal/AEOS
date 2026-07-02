@@ -4344,7 +4344,11 @@ def brain_context_cmd(
         ctx = assembler.assemble(question, token_budget=budget)
 
     if as_json:
-        typer.echo(json.dumps(dataclasses.asdict(ctx), indent=2))
+        # Controlled serialization: project_path is never exposed (sovereignty).
+        ctx_dict = dataclasses.asdict(ctx)
+        if ctx_dict.get("project_identity") is not None:
+            ctx_dict["project_identity"].pop("project_path", None)
+        typer.echo(json.dumps(ctx_dict, indent=2))
         return
 
     typer.echo(f"AEOS Context Preview — {project}")
