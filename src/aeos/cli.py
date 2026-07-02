@@ -4201,6 +4201,85 @@ def brain_status_cmd(
     typer.echo("  sovereign: true  ·  offline: true  ·  local-first: true")
 
 
+@brain_app.command("context")
+def brain_context_cmd(
+    project: str = typer.Option(..., "--project", help="Project name."),
+    question: str = typer.Option(
+        ..., "--question", "-q", help="Question to assemble context for."
+    ),
+    budget: int = typer.Option(
+        4000,
+        "--budget",
+        help="Token budget for context assembly (default: 4000).",
+    ),
+    brain_dir: str = typer.Option(
+        "",
+        "--brain-dir",
+        help="Path to brain directory (default: ~/.aeos/brain).",
+    ),
+    as_json: bool = typer.Option(
+        False, "--json", help="Output the AIContext as JSON."
+    ),
+) -> None:
+    """Preview the context that would be sent to an AI — without calling any AI.
+
+    Selects and ranks Brain facts for the given question within a token budget.
+    No AI is called. Sovereign, offline, local-first.
+    """
+    import dataclasses
+
+    from aeos.brain.assembler import ContextAssembler
+    from aeos.brain.store import DEFAULT_BRAIN_DIR, BrainStore
+
+    b_dir = Path(brain_dir) if brain_dir else DEFAULT_BRAIN_DIR
+
+    if not BrainStore.exists(b_dir, project):
+        typer.echo(
+            f"Error: Brain not found for project '{project}'."
+            f" Run: aeos brain init --project {project}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    with BrainStore.open(b_dir, project) as brain:
+        assembler = ContextAssembler(brain)
+        ctx = assembler.assemble(question, token_budget=budget)
+
+    if as_json:
+        typer.echo(json.dumps(dataclasses.asdict(ctx), indent=2))
+        return
+
+    typer.echo(f"AEOS Context Preview — {project}")
+    typer.echo("=" * 50)
+    typer.echo(f"Brain version:  {ctx.brain_version}")
+    typer.echo(f'Question:       "{ctx.question}"')
+    typer.echo(f"Dimensions:     {', '.join(ctx.dimensions)}")
+    typer.echo(f"Budget:         {ctx.token_budget} tokens")
+    typer.echo(f"Estimated:      {ctx.token_estimate} tokens")
+    typer.echo(f"Truncated:      {'yes' if ctx.truncated else 'no'}")
+    typer.echo("")
+    typer.echo(f"Facts selected ({len(ctx.facts)})")
+    for fact in ctx.facts:
+        sev = f"[{fact.severity or 'NONE'}]"
+        typer.echo(f"  {sev:<10} {fact.dimension:<14}  {fact.summary}")
+    if not ctx.facts:
+        typer.echo("  (no facts selected)")
+    typer.echo("")
+    typer.echo(f"Decisions ({len(ctx.decisions)})")
+    for i, decision in enumerate(ctx.decisions, 1):
+        typer.echo(f"  {i}. {decision.title}")
+    if not ctx.decisions:
+        typer.echo("  (none)")
+    typer.echo("")
+    typer.echo(f"Vocabulary ({len(ctx.vocabulary)})")
+    if ctx.vocabulary:
+        typer.echo(f"  {', '.join(t.term for t in ctx.vocabulary)}")
+    else:
+        typer.echo("  (none)")
+    typer.echo("")
+    typer.echo("  sovereign: true  ·  offline: true  ·  no AI called")
+
+
 @brain_app.command("build")
 def brain_build_cmd(
     project: str = typer.Option(..., "--project", help="Project name."),
