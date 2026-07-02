@@ -4199,3 +4199,50 @@ def brain_status_cmd(
         typer.echo("  (no facts yet)")
     typer.echo("")
     typer.echo("  sovereign: true  ·  offline: true  ·  local-first: true")
+
+
+@brain_app.command("build")
+def brain_build_cmd(
+    project: str = typer.Option(..., "--project", help="Project name."),
+    brain_dir: str = typer.Option(
+        "",
+        "--brain-dir",
+        help="Path to brain directory (default: ~/.aeos/brain).",
+    ),
+    memory_dir: str = typer.Option(
+        "",
+        "--memory-dir",
+        help="Path to memory directory (default: ~/.aeos/memory).",
+    ),
+) -> None:
+    """Build the Project Brain from local MemoryRecords. Idempotent.
+
+    Reads MemoryRecords from <memory-dir>/<project>/ and populates the Brain.
+    Auto-initializes the Brain if not already created.
+    """
+    from aeos.brain.extractor import BrainExtractor
+    from aeos.brain.store import DEFAULT_BRAIN_DIR, BrainStore
+
+    b_dir = Path(brain_dir) if brain_dir else DEFAULT_BRAIN_DIR
+    m_dir = Path(memory_dir) if memory_dir else Path.home() / ".aeos" / "memory"
+
+    project_memory_dir = m_dir / project
+    if not project_memory_dir.exists():
+        typer.echo(
+            f"Error: no memory records found for project '{project}'."
+            f" Expected: {project_memory_dir}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    with BrainStore.open(b_dir, project) as brain:
+        extractor = BrainExtractor(brain)
+        result = extractor.build(project, m_dir)
+
+    typer.echo(f"AEOS Project Brain — {project}")
+    typer.echo("")
+    typer.echo(f"Records processed: {result.records_processed}")
+    typer.echo(f"Facts extracted:   {result.facts_extracted}")
+    typer.echo(f"Facts inserted:    {result.facts_inserted}")
+    typer.echo("")
+    typer.echo("  sovereign: true  ·  offline: true  ·  local-first: true")

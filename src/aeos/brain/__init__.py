@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from aeos.brain.extractor import BrainExtractor, ExtractionResult
 from aeos.brain.models import (
     BrainStatus,
     Decision,
@@ -14,9 +15,11 @@ from aeos.brain.store import DEFAULT_BRAIN_DIR, BrainStore
 
 __all__ = [
     "DEFAULT_BRAIN_DIR",
+    "BrainExtractor",
     "BrainStatus",
     "BrainStore",
     "Decision",
+    "ExtractionResult",
     "InteractionRecord",
     "KnowledgeFact",
     "ProjectIdentity",
