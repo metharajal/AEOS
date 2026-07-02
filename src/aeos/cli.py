@@ -5,7 +5,13 @@ from typing import Annotated
 
 import typer
 
-from aeos.ai import AiRouterError, ask_ai, read_ai_config, run_ai_doctor
+from aeos.ai import (
+    AiRouterError,
+    ask_ai,
+    default_ai_config,
+    read_ai_config,
+    run_ai_doctor,
+)
 from aeos.generators import GENERATORS
 from aeos.onboarding import check_project
 from aeos.project import inspect_project
@@ -48,6 +54,9 @@ agent_app = typer.Typer(
 agent_pr_app = typer.Typer(
     help="Agent PR commands — read-only local proposal management."
 )
+brain_app = typer.Typer(
+    help="Project Brain — local sovereign knowledge store. Zero AI, zero network."
+)
 agent_app.add_typer(agent_pr_app, name="pr")
 app.add_typer(project_app, name="project")
 app.add_typer(ai_app, name="ai")
@@ -64,6 +73,7 @@ app.add_typer(build_app, name="build")
 app.add_typer(ui_app, name="ui")
 app.add_typer(workspace_app, name="workspace")
 app.add_typer(agent_app, name="agent")
+app.add_typer(brain_app, name="brain")
 
 REQUIRED_TOOLS = ["python", "uv", "git", "docker", "node", "pnpm", "gh", "code"]
 
@@ -4113,3 +4123,307 @@ def agent_pr_apply_cmd(
     typer.echo(f"  apply-log:     {result.apply_log_path}")
     typer.echo(f"  memory-record: {result.memory_record_path}")
     typer.echo("  human_validated: true  ·  applied: true  ·  read_only: false")
+
+
+# ---------------------------------------------------------------------------
+# brain — Project Brain (local sovereign knowledge store)
+# ---------------------------------------------------------------------------
+
+
+@brain_app.command("ask")
+def brain_ask_cmd(
+    project: str = typer.Option(..., "--project", help="Project name."),
+    question: str = typer.Option(
+        ..., "--question", "-q", help="Question to ask the local AI."
+    ),
+    budget: int = typer.Option(
+        4000, "--budget", help="Token budget for context assembly (default: 4000)."
+    ),
+    timeout: int = typer.Option(
+        30, "--timeout", help="AI request timeout in seconds (default: 30)."
+    ),
+    brain_dir: str = typer.Option(
+        "",
+        "--brain-dir",
+        help="Path to brain directory (default: ~/.aeos/brain).",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Ask the local AI a question grounded in the Project Brain.
+
+    Assembles context from the Brain, sends it to the local model, and logs
+    the interaction. Local only — no data leaves the machine.
+    """
+    import uuid
+    from datetime import UTC, datetime
+
+    from aeos.brain.assembler import ContextAssembler
+    from aeos.brain.models import InteractionRecord
+    from aeos.brain.prompt import format_context_as_prompt
+    from aeos.brain.store import DEFAULT_BRAIN_DIR, BrainStore
+
+    b_dir = Path(brain_dir) if brain_dir else DEFAULT_BRAIN_DIR
+
+    if not BrainStore.exists(b_dir, project):
+        typer.echo(
+            f"Error: Brain for '{project}' not found."
+            f" Run: aeos brain init --project {project}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    config = read_ai_config(Path(".")) or default_ai_config()
+
+    with BrainStore.open(b_dir, project) as brain:
+        ctx = ContextAssembler(brain).assemble(question, token_budget=budget)
+        prompt_str = format_context_as_prompt(ctx)
+
+        try:
+            response = ask_ai(prompt_str, config, provider="local", timeout=timeout)
+        except AiRouterError as e:
+            typer.echo(f"Error: {e}", err=True)
+            raise typer.Exit(code=1) from None
+
+        brain.log_interaction(
+            InteractionRecord(
+                id=str(uuid.uuid4()),
+                question=question,
+                brain_version=ctx.brain_version,
+                dimensions=ctx.dimensions,
+                token_budget=ctx.token_budget,
+                provider=response.provider_used,
+                model=config.local.default_model,
+                response_summary=response.text[:500],
+                asked_at=datetime.now(tz=UTC).isoformat(),
+            )
+        )
+
+    if as_json:
+        typer.echo(
+            json.dumps(
+                {
+                    "question": question,
+                    "brain_version": ctx.brain_version,
+                    "dimensions": ctx.dimensions,
+                    "provider_used": response.provider_used,
+                    "model": config.local.default_model,
+                    "truncated": ctx.truncated,
+                    "response": response.text,
+                },
+                indent=2,
+            )
+        )
+        return
+
+    if ctx.truncated:
+        typer.echo(
+            "[Warning: context was truncated — some facts omitted]", err=True
+        )
+    typer.echo(response.text)
+
+
+@brain_app.command("init")
+def brain_init_cmd(
+    project: str = typer.Option(..., "--project", help="Project name."),
+    brain_dir: str = typer.Option(
+        "",
+        "--brain-dir",
+        help="Path to brain directory (default: ~/.aeos/brain).",
+    ),
+) -> None:
+    """Initialize a Project Brain for a project.
+
+    Creates ~/.aeos/brain/<project>.db (or <brain-dir>/<project>.db).
+    Safe to run multiple times — idempotent.
+    """
+    from aeos.brain.store import DEFAULT_BRAIN_DIR, BrainStore
+
+    b_dir = Path(brain_dir) if brain_dir else DEFAULT_BRAIN_DIR
+    db_path = BrainStore.db_path_for(b_dir, project)
+
+    if BrainStore.exists(b_dir, project):
+        typer.echo(f"Brain already exists: {db_path}")
+        raise typer.Exit(code=0)
+
+    with BrainStore.open(b_dir, project):
+        pass  # schema created on open
+
+    typer.echo(f"Brain initialized: {db_path}")
+
+
+@brain_app.command("status")
+def brain_status_cmd(
+    project: str = typer.Option(..., "--project", help="Project name."),
+    brain_dir: str = typer.Option(
+        "",
+        "--brain-dir",
+        help="Path to brain directory (default: ~/.aeos/brain).",
+    ),
+) -> None:
+    """Show the status of a Project Brain."""
+    from aeos.brain.store import DEFAULT_BRAIN_DIR, BrainStore
+
+    b_dir = Path(brain_dir) if brain_dir else DEFAULT_BRAIN_DIR
+
+    if not BrainStore.exists(b_dir, project):
+        typer.echo(
+            f"Error: Brain not found for project '{project}'."
+            f" Run: aeos brain init --project {project}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    with BrainStore.open(b_dir, project) as brain:
+        s = brain.get_status()
+
+    name = s.project_name if s.project_name else project
+    typer.echo(f"AEOS Project Brain — {name}")
+    typer.echo("")
+    typer.echo(f"Path:            {s.db_path}")
+    typer.echo(f"Schema version:  {s.schema_version}")
+    typer.echo(f"Brain version:   {s.brain_version}")
+    typer.echo("")
+    typer.echo("Knowledge Base")
+    typer.echo(f"  Facts:         {s.facts_count}")
+    typer.echo(f"  Decisions:     {s.decisions_count}")
+    typer.echo(f"  Vocabulary:    {s.vocabulary_count}")
+    typer.echo(f"  Interactions:  {s.interactions_count}")
+    typer.echo("")
+    typer.echo("Dimensions")
+    if s.dimension_counts:
+        for dim, count in sorted(s.dimension_counts.items()):
+            typer.echo(f"  {dim:<16} {count}")
+    else:
+        typer.echo("  (no facts yet)")
+    typer.echo("")
+    typer.echo("  sovereign: true  ·  offline: true  ·  local-first: true")
+
+
+@brain_app.command("context")
+def brain_context_cmd(
+    project: str = typer.Option(..., "--project", help="Project name."),
+    question: str = typer.Option(
+        ..., "--question", "-q", help="Question to assemble context for."
+    ),
+    budget: int = typer.Option(
+        4000,
+        "--budget",
+        help="Token budget for context assembly (default: 4000).",
+    ),
+    brain_dir: str = typer.Option(
+        "",
+        "--brain-dir",
+        help="Path to brain directory (default: ~/.aeos/brain).",
+    ),
+    as_json: bool = typer.Option(
+        False, "--json", help="Output the AIContext as JSON."
+    ),
+) -> None:
+    """Preview the context that would be sent to an AI — without calling any AI.
+
+    Selects and ranks Brain facts for the given question within a token budget.
+    No AI is called. Sovereign, offline, local-first.
+    """
+    import dataclasses
+
+    from aeos.brain.assembler import ContextAssembler
+    from aeos.brain.store import DEFAULT_BRAIN_DIR, BrainStore
+
+    b_dir = Path(brain_dir) if brain_dir else DEFAULT_BRAIN_DIR
+
+    if not BrainStore.exists(b_dir, project):
+        typer.echo(
+            f"Error: Brain not found for project '{project}'."
+            f" Run: aeos brain init --project {project}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    with BrainStore.open(b_dir, project) as brain:
+        assembler = ContextAssembler(brain)
+        ctx = assembler.assemble(question, token_budget=budget)
+
+    if as_json:
+        # Controlled serialization: project_path is never exposed (sovereignty).
+        ctx_dict = dataclasses.asdict(ctx)
+        if ctx_dict.get("project_identity") is not None:
+            ctx_dict["project_identity"].pop("project_path", None)
+        typer.echo(json.dumps(ctx_dict, indent=2))
+        return
+
+    typer.echo(f"AEOS Context Preview — {project}")
+    typer.echo("=" * 50)
+    typer.echo(f"Brain version:  {ctx.brain_version}")
+    typer.echo(f'Question:       "{ctx.question}"')
+    typer.echo(f"Dimensions:     {', '.join(ctx.dimensions)}")
+    typer.echo(f"Budget:         {ctx.token_budget} tokens")
+    typer.echo(f"Estimated:      {ctx.token_estimate} tokens")
+    typer.echo(f"Truncated:      {'yes' if ctx.truncated else 'no'}")
+    typer.echo("")
+    typer.echo(f"Facts selected ({len(ctx.facts)})")
+    for fact in ctx.facts:
+        sev = f"[{fact.severity or 'NONE'}]"
+        typer.echo(f"  {sev:<10} {fact.dimension:<14}  {fact.summary}")
+    if not ctx.facts:
+        typer.echo("  (no facts selected)")
+    typer.echo("")
+    typer.echo(f"Decisions ({len(ctx.decisions)})")
+    for i, decision in enumerate(ctx.decisions, 1):
+        typer.echo(f"  {i}. {decision.title}")
+    if not ctx.decisions:
+        typer.echo("  (none)")
+    typer.echo("")
+    typer.echo(f"Vocabulary ({len(ctx.vocabulary)})")
+    if ctx.vocabulary:
+        typer.echo(f"  {', '.join(t.term for t in ctx.vocabulary)}")
+    else:
+        typer.echo("  (none)")
+    typer.echo("")
+    typer.echo("  sovereign: true  ·  offline: true  ·  no AI called")
+
+
+@brain_app.command("build")
+def brain_build_cmd(
+    project: str = typer.Option(..., "--project", help="Project name."),
+    brain_dir: str = typer.Option(
+        "",
+        "--brain-dir",
+        help="Path to brain directory (default: ~/.aeos/brain).",
+    ),
+    memory_dir: str = typer.Option(
+        "",
+        "--memory-dir",
+        help="Path to memory directory (default: ~/.aeos/memory).",
+    ),
+) -> None:
+    """Build the Project Brain from local MemoryRecords. Idempotent.
+
+    Reads MemoryRecords from <memory-dir>/<project>/ and populates the Brain.
+    Auto-initializes the Brain if not already created.
+    """
+    from aeos.brain.extractor import BrainExtractor
+    from aeos.brain.store import DEFAULT_BRAIN_DIR, BrainStore
+
+    b_dir = Path(brain_dir) if brain_dir else DEFAULT_BRAIN_DIR
+    m_dir = Path(memory_dir) if memory_dir else Path.home() / ".aeos" / "memory"
+
+    project_memory_dir = m_dir / project
+    if not project_memory_dir.exists():
+        typer.echo(
+            f"Error: no memory records found for project '{project}'."
+            f" Expected: {project_memory_dir}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    with BrainStore.open(b_dir, project) as brain:
+        extractor = BrainExtractor(brain)
+        result = extractor.build(project, m_dir)
+
+    typer.echo(f"AEOS Project Brain — {project}")
+    typer.echo("")
+    typer.echo(f"Records processed: {result.records_processed}")
+    typer.echo(f"Facts extracted:   {result.facts_extracted}")
+    typer.echo(f"Facts inserted:    {result.facts_inserted}")
+    typer.echo("")
+    typer.echo("  sovereign: true  ·  offline: true  ·  local-first: true")

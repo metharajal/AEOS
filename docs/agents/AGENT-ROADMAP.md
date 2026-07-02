@@ -1,8 +1,8 @@
 # AEOS Agent Roadmap
 
-**Version:** 1.1
-**Updated:** MVP-DOCS-ALIGN-1 (2026-07-02)
-**Status:** UPDATED — reflects sprints as delivered through MVP-AGENTS-6A
+**Version:** 1.2
+**Updated:** CAP-1 (2026-07-02)
+**Status:** UPDATED — reflects sprints as delivered through CAP-1
 
 ---
 
@@ -192,6 +192,31 @@ may already have violated it.
 
 ---
 
+## CAP-1 — Human-Gated Apply Engine
+
+**Status:** COMPLETE
+**Branch:** `cap1/sprint-a`
+**PR:** #84 · `0f5563fd`
+
+**What was built:**
+- `src/aeos/agent/apply_engine.py` — `ApplyContext`, `ApplyResult`, `run_apply()`
+- `aeos agent pr apply <id>` CLI command — shows proposal, prompts for `APPLY <id>`, calls engine on correct confirmation, displays paths on success
+- Evidence-first invariant: `apply-log.json` written before `status → applied`
+- APPLY.PRE.05 guard: `FileExistsError` if apply-log already exists (prevents evidence destruction on retry)
+- `build_memory_record_from_apply()` in `store.py` — `human_validated=True`, `applied=True`
+- 44 unit tests (`test_apply_engine.py`) + 23 CLI tests (`test_cli_agent_pr_apply.py`)
+
+**Constraints met:**
+- `--yes` forever forbidden — only `APPLY <id>` typed exactly by human is accepted
+- Wrong or partial confirmation: exit 0, zero files written
+- Status transitions to `applied` only after `apply-log.json` exists on disk
+- `ProposalRepository` remains read-only — `run_apply()` calls `update_proposal_status()` directly
+- No network call, no secret access, no write outside `proposals_dir/<id>/` and `memory_dir/`
+
+**Closes:** Core Loop (Flux A) — `Inspect → MemoryRecord → Proposal → Human Gate → Apply → Evidence → MemoryRecord`
+
+---
+
 ## MVP-AGENTS-7 — Controlled Local Model Integration
 
 **Status:** PLANNED
@@ -305,5 +330,6 @@ No agent sprint closes without all five gates satisfied.
 | MVP-AGENTS-5A | — | Evidence doc | No | COMPLETE |
 | MVP-AGENTS-6 | `aeos agent pr list/show` | Controlled PR management | No | COMPLETE |
 | MVP-AGENTS-6A | — | Evidence doc | No | COMPLETE |
+| CAP-1 | `aeos agent pr apply` | Human-gated Apply Engine | No | COMPLETE |
 | MVP-AGENTS-7 | `aeos agent plan --model` | Local model plan | Ollama (local) | PLANNED |
 | MVP-AGENTS-8 | `aeos agent plan --escalate` | Frontier escalation | Claude / GPT-4 | PLANNED |
