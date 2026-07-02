@@ -1,7 +1,7 @@
 # AEOS AI Runtime Doctrine
 
 **Version:** 1.0
-**Status:** RATIFIED
+**Status:** PROPOSED
 **Date:** 2026-07-02
 **Sprint:** MVP-DOCS-ALIGN-1
 **Authority:** [CONSTITUTION.md](../../CONSTITUTION.md) §5.3 · [AI-DEVELOPMENT-POLICY.md](../AI-DEVELOPMENT-POLICY.md)
@@ -473,6 +473,13 @@ The replacement test passes when:
 1. User installs new runtime (e.g., vLLM)
 2. User edits `aeos.toml`: `base_url = "http://localhost:8000"` and `default_model = "mistral"`
 3. `aeos agent plan` uses the new runtime without any AEOS update
+
+For runtimes that do not speak OpenAI-compatible format, `api_style = "custom"`
+in `aeos.toml` signals that an adapter must be registered. The custom adapter
+handles the format translation; the AIProvider contract above remains the same.
+The choice of OpenAI-compatible format is a pragmatic convergence point, not an
+obligation. AEOS must never reject a provider solely because it uses a different
+HTTP format.
 
 ---
 
