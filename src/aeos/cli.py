@@ -5,7 +5,13 @@ from typing import Annotated
 
 import typer
 
-from aeos.ai import AiRouterError, ask_ai, read_ai_config, run_ai_doctor
+from aeos.ai import (
+    AiRouterError,
+    ask_ai,
+    default_ai_config,
+    read_ai_config,
+    run_ai_doctor,
+)
 from aeos.generators import GENERATORS
 from aeos.onboarding import check_project
 from aeos.project import inspect_project
@@ -4122,6 +4128,98 @@ def agent_pr_apply_cmd(
 # ---------------------------------------------------------------------------
 # brain — Project Brain (local sovereign knowledge store)
 # ---------------------------------------------------------------------------
+
+
+@brain_app.command("ask")
+def brain_ask_cmd(
+    project: str = typer.Option(..., "--project", help="Project name."),
+    question: str = typer.Option(
+        ..., "--question", "-q", help="Question to ask the local AI."
+    ),
+    budget: int = typer.Option(
+        4000, "--budget", help="Token budget for context assembly (default: 4000)."
+    ),
+    timeout: int = typer.Option(
+        30, "--timeout", help="AI request timeout in seconds (default: 30)."
+    ),
+    brain_dir: str = typer.Option(
+        "",
+        "--brain-dir",
+        help="Path to brain directory (default: ~/.aeos/brain).",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON."),
+) -> None:
+    """Ask the local AI a question grounded in the Project Brain.
+
+    Assembles context from the Brain, sends it to the local model, and logs
+    the interaction. Local only — no data leaves the machine.
+    """
+    import uuid
+    from datetime import UTC, datetime
+
+    from aeos.brain.assembler import ContextAssembler
+    from aeos.brain.models import InteractionRecord
+    from aeos.brain.prompt import format_context_as_prompt
+    from aeos.brain.store import DEFAULT_BRAIN_DIR, BrainStore
+
+    b_dir = Path(brain_dir) if brain_dir else DEFAULT_BRAIN_DIR
+
+    if not BrainStore.exists(b_dir, project):
+        typer.echo(
+            f"Error: Brain for '{project}' not found."
+            f" Run: aeos brain init --project {project}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    config = read_ai_config(Path(".")) or default_ai_config()
+
+    with BrainStore.open(b_dir, project) as brain:
+        ctx = ContextAssembler(brain).assemble(question, token_budget=budget)
+        prompt_str = format_context_as_prompt(ctx)
+
+        try:
+            response = ask_ai(prompt_str, config, provider="local", timeout=timeout)
+        except AiRouterError as e:
+            typer.echo(f"Error: {e}", err=True)
+            raise typer.Exit(code=1) from None
+
+        brain.log_interaction(
+            InteractionRecord(
+                id=str(uuid.uuid4()),
+                question=question,
+                brain_version=ctx.brain_version,
+                dimensions=ctx.dimensions,
+                token_budget=ctx.token_budget,
+                provider=response.provider_used,
+                model=config.local.default_model,
+                response_summary=response.text[:500],
+                asked_at=datetime.now(tz=UTC).isoformat(),
+            )
+        )
+
+    if as_json:
+        typer.echo(
+            json.dumps(
+                {
+                    "question": question,
+                    "brain_version": ctx.brain_version,
+                    "dimensions": ctx.dimensions,
+                    "provider_used": response.provider_used,
+                    "model": config.local.default_model,
+                    "truncated": ctx.truncated,
+                    "response": response.text,
+                },
+                indent=2,
+            )
+        )
+        return
+
+    if ctx.truncated:
+        typer.echo(
+            "[Warning: context was truncated — some facts omitted]", err=True
+        )
+    typer.echo(response.text)
 
 
 @brain_app.command("init")

@@ -12,6 +12,7 @@ from aeos.brain.models import (
     ProjectIdentity,
     VocabularyTerm,
 )
+from aeos.brain.prompt import format_context_as_prompt
 from aeos.brain.store import DEFAULT_BRAIN_DIR, BrainStore
 
 __all__ = [
@@ -27,4 +28,5 @@ __all__ = [
     "KnowledgeFact",
     "ProjectIdentity",
     "VocabularyTerm",
+    "format_context_as_prompt",
 ]

@@ -69,6 +69,11 @@ def _default_config(source: str) -> AiConfig:
     )
 
 
+def default_ai_config() -> AiConfig:
+    """Return the built-in default AI configuration (local-first, no frontier)."""
+    return _default_config("(defaults)")
+
+
 def read_ai_config(path: Path) -> AiConfig | None:
     toml_path = path / "aeos.toml"
     if not toml_path.is_file():
