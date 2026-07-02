@@ -48,6 +48,9 @@ agent_app = typer.Typer(
 agent_pr_app = typer.Typer(
     help="Agent PR commands — read-only local proposal management."
 )
+brain_app = typer.Typer(
+    help="Project Brain — local sovereign knowledge store. Zero AI, zero network."
+)
 agent_app.add_typer(agent_pr_app, name="pr")
 app.add_typer(project_app, name="project")
 app.add_typer(ai_app, name="ai")
@@ -64,6 +67,7 @@ app.add_typer(build_app, name="build")
 app.add_typer(ui_app, name="ui")
 app.add_typer(workspace_app, name="workspace")
 app.add_typer(agent_app, name="agent")
+app.add_typer(brain_app, name="brain")
 
 REQUIRED_TOOLS = ["python", "uv", "git", "docker", "node", "pnpm", "gh", "code"]
 
@@ -4113,3 +4117,85 @@ def agent_pr_apply_cmd(
     typer.echo(f"  apply-log:     {result.apply_log_path}")
     typer.echo(f"  memory-record: {result.memory_record_path}")
     typer.echo("  human_validated: true  ·  applied: true  ·  read_only: false")
+
+
+# ---------------------------------------------------------------------------
+# brain — Project Brain (local sovereign knowledge store)
+# ---------------------------------------------------------------------------
+
+
+@brain_app.command("init")
+def brain_init_cmd(
+    project: str = typer.Option(..., "--project", help="Project name."),
+    brain_dir: str = typer.Option(
+        "",
+        "--brain-dir",
+        help="Path to brain directory (default: ~/.aeos/brain).",
+    ),
+) -> None:
+    """Initialize a Project Brain for a project.
+
+    Creates ~/.aeos/brain/<project>.db (or <brain-dir>/<project>.db).
+    Safe to run multiple times — idempotent.
+    """
+    from aeos.brain.store import DEFAULT_BRAIN_DIR, BrainStore
+
+    b_dir = Path(brain_dir) if brain_dir else DEFAULT_BRAIN_DIR
+    db_path = BrainStore.db_path_for(b_dir, project)
+
+    if BrainStore.exists(b_dir, project):
+        typer.echo(f"Brain already exists: {db_path}")
+        raise typer.Exit(code=0)
+
+    with BrainStore.open(b_dir, project):
+        pass  # schema created on open
+
+    typer.echo(f"Brain initialized: {db_path}")
+
+
+@brain_app.command("status")
+def brain_status_cmd(
+    project: str = typer.Option(..., "--project", help="Project name."),
+    brain_dir: str = typer.Option(
+        "",
+        "--brain-dir",
+        help="Path to brain directory (default: ~/.aeos/brain).",
+    ),
+) -> None:
+    """Show the status of a Project Brain."""
+    from aeos.brain.store import DEFAULT_BRAIN_DIR, BrainStore
+
+    b_dir = Path(brain_dir) if brain_dir else DEFAULT_BRAIN_DIR
+
+    if not BrainStore.exists(b_dir, project):
+        typer.echo(
+            f"Error: Brain not found for project '{project}'."
+            f" Run: aeos brain init --project {project}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    with BrainStore.open(b_dir, project) as brain:
+        s = brain.get_status()
+
+    name = s.project_name if s.project_name else project
+    typer.echo(f"AEOS Project Brain — {name}")
+    typer.echo("")
+    typer.echo(f"Path:            {s.db_path}")
+    typer.echo(f"Schema version:  {s.schema_version}")
+    typer.echo(f"Brain version:   {s.brain_version}")
+    typer.echo("")
+    typer.echo("Knowledge Base")
+    typer.echo(f"  Facts:         {s.facts_count}")
+    typer.echo(f"  Decisions:     {s.decisions_count}")
+    typer.echo(f"  Vocabulary:    {s.vocabulary_count}")
+    typer.echo(f"  Interactions:  {s.interactions_count}")
+    typer.echo("")
+    typer.echo("Dimensions")
+    if s.dimension_counts:
+        for dim, count in sorted(s.dimension_counts.items()):
+            typer.echo(f"  {dim:<16} {count}")
+    else:
+        typer.echo("  (no facts yet)")
+    typer.echo("")
+    typer.echo("  sovereign: true  ·  offline: true  ·  local-first: true")
