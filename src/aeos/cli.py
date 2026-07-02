@@ -45,6 +45,10 @@ workspace_app = typer.Typer(
 agent_app = typer.Typer(
     help="Agent commands — deterministic planning and recommendations."
 )
+agent_pr_app = typer.Typer(
+    help="Agent PR commands — read-only local proposal management."
+)
+agent_app.add_typer(agent_pr_app, name="pr")
 app.add_typer(project_app, name="project")
 app.add_typer(ai_app, name="ai")
 app.add_typer(sovereignty_app, name="sovereignty")
@@ -3944,3 +3948,61 @@ def agent_pr_proposal_cmd(
         out_path.write_text(md, encoding="utf-8")
         typer.echo("")
         typer.echo(f"Proposal written to: {out_path}")
+
+
+# ---------------------------------------------------------------------------
+# agent pr list / show — controlled read-only proposal management
+# ---------------------------------------------------------------------------
+
+
+@agent_pr_app.command("list")
+def agent_pr_list_cmd(
+    proposals_dir: str = typer.Option(
+        "",
+        "--proposals-dir",
+        help=("Path to proposals directory (default: ~/.aeos/workspace/proposals/)."),
+    ),
+) -> None:
+    """List all local PR proposals, sorted by date descending."""
+    from aeos.agent.pr_management import (
+        DEFAULT_PROPOSALS_DIR,
+        ProposalRepository,
+        render_proposal_list,
+    )
+
+    p_dir = Path(proposals_dir) if proposals_dir else DEFAULT_PROPOSALS_DIR
+    repo = ProposalRepository(p_dir)
+    proposals = repo.list()
+    typer.echo(render_proposal_list(proposals))
+
+
+@agent_pr_app.command("show")
+def agent_pr_show_cmd(
+    proposal_id: str = typer.Argument(..., help="Proposal ID to display."),
+    proposals_dir: str = typer.Option(
+        "",
+        "--proposals-dir",
+        help=("Path to proposals directory (default: ~/.aeos/workspace/proposals/)."),
+    ),
+) -> None:
+    """Show the full detail of a local PR proposal."""
+    from aeos.agent.pr_management import (
+        DEFAULT_PROPOSALS_DIR,
+        ProposalRepository,
+        render_proposal_detail,
+    )
+
+    p_dir = Path(proposals_dir) if proposals_dir else DEFAULT_PROPOSALS_DIR
+    repo = ProposalRepository(p_dir)
+
+    try:
+        proposal = repo.get(proposal_id)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if proposal is None:
+        typer.echo(f"Error: Proposal '{proposal_id}' not found.", err=True)
+        raise typer.Exit(code=1)
+
+    typer.echo(render_proposal_detail(proposal))
