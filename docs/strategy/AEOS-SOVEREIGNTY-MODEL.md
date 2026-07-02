@@ -4,7 +4,8 @@
 **Status:** PROPOSED
 **Date:** 2026-07-02
 **Type:** Conceptual foundation — no implementation, no technology names
-**Governs:** MVP scope, roadmap prioritization, all product decisions
+**Informs:** MVP roadmap prioritization
+**Authority:** [AEOS-ENGINEERING-MODEL.md](../architecture/AEOS-ENGINEERING-MODEL.md) · [CONSTITUTION.md](../../CONSTITUTION.md)
 
 ---
 
@@ -130,7 +131,7 @@ catastrophic exposure. A schema that cannot be migrated is a permanent dependenc
 the current database provider. A product without data portability cannot be sold,
 audited, or regulated.
 
-**Les quatre sous-dimensions**
+**Les cinq sous-dimensions**
 
 | Sous-dimension | Question de contrôle |
 |---|---|
@@ -138,6 +139,7 @@ audited, or regulated.
 | Contrôle d'accès | Access is enforced at the data level, not only at the application level |
 | Portabilité | The data can be migrated to a different system using documented, tested procedures |
 | Traçabilité | Every schema change is documented, versioned, and reversible |
+| Résilience | Backups exist, are regularly tested and verifiable, and are under the owner's exclusive control |
 
 **La garantie qu'AEOS doit apporter**
 AEOS must audit data sovereignty: inspect access control policies, classify data
@@ -148,6 +150,14 @@ does not control.
 ---
 
 ### Pilier 3 — Souveraineté de l'IA
+
+> **Périmètre :** Ce pilier s'applique à tout produit où des systèmes d'IA ont participé
+> à la construction, où l'IA est utilisée dans le développement continu, ou où l'IA opère
+> au sein du produit en production. Pour un produit sans aucune implication d'IA à quelque
+> niveau que ce soit, ce pilier ne s'applique pas. AEOS applique ce pilier à lui-même : sa
+> propre gouvernance IA (routage local-first, remplaçabilité des providers, journalisation
+> des interactions) est une implémentation de ces mêmes garanties — pas une préoccupation
+> séparée.
 
 **Définition**
 The owner controls which AI systems reason about their product, what information those
@@ -393,6 +403,7 @@ prioritized — they have the highest conversion ratio (build on what exists, cl
 
 ### Sprint S-1 — Fermer la boucle de souveraineté du code
 **Pilier : Code + Connaissance**
+**Capacités constitutionnelles :** Govern · Recover
 
 The single most impactful sprint. Produce evidence-backed governance documents IN the
 governed project, based on real audit findings — not templates. This is the first time
@@ -410,6 +421,7 @@ Split into two sub-sprints if needed: Apply Engine (S-1a), then Governance Injec
 
 ### Sprint S-2 — Démontrer la souveraineté IA de bout en bout
 **Pilier : IA**
+**Capacités constitutionnelles :** Continue · Govern
 
 The AI sovereignty pillar is the most visible promise and the most under-verified.
 This sprint closes the replaceability gap, adds AI interaction logging, and verifies
@@ -425,6 +437,7 @@ it is making existing features provably correct.
 
 ### Sprint S-3 — Souveraineté des données : au-delà du contrôle d'accès
 **Pilier : Données**
+**Capacités constitutionnelles :** Assess · Govern
 
 The data sovereignty pillar has the largest gap: RLS coverage exists but schema
 documentation, migration traceability, and portability are absent. A product whose
@@ -440,6 +453,7 @@ sovereignty regardless of code quality.
 
 ### Sprint S-4 — Souveraineté de la connaissance : les décisions capturées
 **Pilier : Connaissance**
+**Capacités constitutionnelles :** Learn · Govern
 
 Memory records exist. Evidence exists. But decisions are not captured. A product whose
 MemoryRecords show "what happened" but not "why it was decided" has incomplete knowledge
@@ -453,6 +467,7 @@ record complete.
 
 ### Sprint S-5 — Souveraineté opérationnelle : de la planification à l'exécution
 **Pilier : Opérationnel**
+**Capacités constitutionnelles :** Recover · Operate
 
 The recovery plan is excellent. The stages are defined. But no stage can be executed
 under human control today. This sprint makes recovery operational: guided, gated,
@@ -467,6 +482,7 @@ workflow.
 
 ### Sprint S-6 — Souveraineté de l'infrastructure : de l'inventaire à l'action
 **Pilier : Infrastructure**
+**Capacités constitutionnelles :** Assess · Govern
 
 The infrastructure inventory is strong. But inventory without documentation and without
 exit paths is a measurement without remedy. This sprint produces infrastructure
@@ -481,6 +497,7 @@ and how to migrate away from each dependency.
 
 ### Sprint S-7 — Souveraineté opérationnelle : score et progression
 **Pilier : Opérationnel + tous les piliers**
+**Capacités constitutionnelles :** Operate · Learn
 
 By sprint S-6, all pillars have at least one guarantee covered. This sprint synthesizes
 everything into a sovereign score — a single, measurable, communicable metric that
@@ -505,7 +522,7 @@ project, can demonstrate the following to any auditor, investor, or regulator:**
 5. This project can be developed further — with AI assistance that is local, replaceable, and audited.
 6. This project's sovereignty can be maintained — drift is detected and recovery is executable.
 
-**Current honest position:** statements 1, 3, 4, and 5 are partial. Statements 2 and 6 are
+**Current honest position:** statements 1, 4, and 5 are partial. Statements 2, 3, and 6 are
 mostly absent. MVP is S-1 through S-5.
 
 ---
